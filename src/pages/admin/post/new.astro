@@ -2,6 +2,7 @@
 import AdminLayout from '@layouts/AdminLayout.astro';
 
 const baseUrl = import.meta.env.BASE_URL;
+const githubRepo = import.meta.env.PUBLIC_GITHUB_REPO || '';
 ---
 
 <AdminLayout title="Nouveau post">
@@ -46,7 +47,6 @@ const baseUrl = import.meta.env.BASE_URL;
       <div class="card p-4">
         <label class="label mb-2">Images (max 4)</label>
 
-        <!-- Zone de drop -->
         <div
           id="drop-zone"
           class="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-6 text-center hover:border-primary-500 dark:hover:border-primary-400 transition-colors cursor-pointer"
@@ -58,18 +58,10 @@ const baseUrl = import.meta.env.BASE_URL;
             Glissez des images ici ou <span class="text-primary-600 dark:text-primary-400">cliquez pour sélectionner</span>
           </p>
           <p class="text-xs text-slate-400 mt-1">JPG, PNG, WebP, GIF - Max 10 Mo par image</p>
-          <input
-            type="file"
-            id="file-input"
-            class="hidden"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            multiple
-          />
+          <input type="file" id="file-input" class="hidden" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
         </div>
 
-        <!-- Prévisualisation des images -->
-        <div id="image-preview" class="mt-4 grid grid-cols-2 gap-2 hidden">
-        </div>
+        <div id="image-preview" class="mt-4 grid grid-cols-2 gap-2 hidden"></div>
       </div>
 
       <!-- Options de publication -->
@@ -90,15 +82,9 @@ const baseUrl = import.meta.env.BASE_URL;
           </label>
         </div>
 
-        <!-- Sélecteur de date (pour posts programmés) -->
         <div id="schedule-picker" class="mt-4 hidden">
           <label for="scheduled-date" class="label">Date et heure de publication</label>
-          <input
-            type="datetime-local"
-            id="scheduled-date"
-            name="scheduledDate"
-            class="input"
-          />
+          <input type="datetime-local" id="scheduled-date" name="scheduledDate" class="input" />
         </div>
       </div>
 
@@ -110,36 +96,140 @@ const baseUrl = import.meta.env.BASE_URL;
           </svg>
           Publier
         </button>
-        <a href={`${baseUrl}/admin`} class="btn-secondary">
-          Annuler
-        </a>
+        <a href={`${baseUrl}/admin`} class="btn-secondary">Annuler</a>
       </div>
     </form>
   </div>
 </AdminLayout>
 
-<script>
-  import { createOrUpdateFile, uploadImage } from '@lib/github';
-  import { generateTimestamp } from '@lib/utils';
-
-  const baseUrl = import.meta.env.BASE_URL;
+<script define:vars={{ baseUrl, githubRepo }}>
+  const GITHUB_REPO = githubRepo;
+  const API_BASE = 'https://api.github.com';
   const MAX_IMAGES = 4;
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 Mo
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-  interface ImageData {
-    file: File;
-    preview: string;
-    alt: string;
+  function getToken() {
+    return sessionStorage.getItem('github_token');
   }
 
-  let images: ImageData[] = [];
+  function getHeaders() {
+    return {
+      'Authorization': `Bearer ${getToken()}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    };
+  }
 
-  // Éléments DOM
-  const form = document.getElementById('post-form') as HTMLFormElement;
-  const contentInput = document.getElementById('content') as HTMLTextAreaElement;
+  // Créer un blob (fichier) sur GitHub
+  async function createBlob(content, encoding = 'utf-8') {
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/git/blobs`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ content, encoding }),
+    });
+    if (!response.ok) throw new Error('Erreur création blob');
+    return response.json();
+  }
+
+  // Obtenir la référence HEAD
+  async function getRef(branch = 'main') {
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/git/ref/heads/${branch}`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) throw new Error('Erreur récupération ref');
+    return response.json();
+  }
+
+  // Obtenir un commit
+  async function getCommit(sha) {
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/git/commits/${sha}`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) throw new Error('Erreur récupération commit');
+    return response.json();
+  }
+
+  // Créer un tree avec plusieurs fichiers
+  async function createTree(baseTreeSha, files) {
+    const tree = files.map(f => ({
+      path: f.path,
+      mode: '100644',
+      type: 'blob',
+      sha: f.sha,
+    }));
+
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/git/trees`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ base_tree: baseTreeSha, tree }),
+    });
+    if (!response.ok) throw new Error('Erreur création tree');
+    return response.json();
+  }
+
+  // Créer un commit
+  async function createCommit(message, treeSha, parentSha) {
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/git/commits`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        message,
+        tree: treeSha,
+        parents: [parentSha],
+      }),
+    });
+    if (!response.ok) throw new Error('Erreur création commit');
+    return response.json();
+  }
+
+  // Mettre à jour la référence
+  async function updateRef(sha, branch = 'main') {
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/git/refs/heads/${branch}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ sha }),
+    });
+    if (!response.ok) throw new Error('Erreur mise à jour ref');
+    return response.json();
+  }
+
+  // Créer plusieurs fichiers en un seul commit
+  async function createFilesInSingleCommit(files, message) {
+    // 1. Créer les blobs pour chaque fichier
+    const blobs = await Promise.all(
+      files.map(async (f) => {
+        const blob = await createBlob(f.content, f.encoding || 'utf-8');
+        return { path: f.path, sha: blob.sha };
+      })
+    );
+
+    // 2. Obtenir le SHA du dernier commit
+    const ref = await getRef('main');
+    const latestCommitSha = ref.object.sha;
+
+    // 3. Obtenir le tree du dernier commit
+    const latestCommit = await getCommit(latestCommitSha);
+    const baseTreeSha = latestCommit.tree.sha;
+
+    // 4. Créer un nouveau tree avec tous les fichiers
+    const newTree = await createTree(baseTreeSha, blobs);
+
+    // 5. Créer le commit
+    const newCommit = await createCommit(message, newTree.sha, latestCommitSha);
+
+    // 6. Mettre à jour la référence
+    await updateRef(newCommit.sha, 'main');
+
+    return newCommit;
+  }
+
+  let images = [];
+
+  const form = document.getElementById('post-form');
+  const contentInput = document.getElementById('content');
   const charCount = document.getElementById('char-count');
   const dropZone = document.getElementById('drop-zone');
-  const fileInput = document.getElementById('file-input') as HTMLInputElement;
+  const fileInput = document.getElementById('file-input');
   const imagePreview = document.getElementById('image-preview');
   const schedulePicker = document.getElementById('schedule-picker');
   const submitBtn = document.getElementById('submit-btn');
@@ -153,93 +243,50 @@ const baseUrl = import.meta.env.BASE_URL;
     }
   });
 
-  // Afficher/masquer le sélecteur de date
+  // Status change
   document.querySelectorAll('input[name="status"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
-      const target = e.target as HTMLInputElement;
-      if (schedulePicker) {
-        schedulePicker.classList.toggle('hidden', target.value !== 'scheduled');
-      }
-      if (submitBtn) {
-        submitBtn.innerHTML = target.value === 'draft'
-          ? `<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>Enregistrer le brouillon`
-          : target.value === 'scheduled'
-          ? `<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Programmer`
-          : `<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>Publier`;
-      }
+      schedulePicker?.classList.toggle('hidden', e.target.value !== 'scheduled');
     });
   });
 
   // Drag & Drop
   dropZone?.addEventListener('click', () => fileInput?.click());
-
-  dropZone?.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.classList.add('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/20');
-  });
-
-  dropZone?.addEventListener('dragleave', () => {
-    dropZone.classList.remove('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/20');
-  });
-
+  dropZone?.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-primary-500'); });
+  dropZone?.addEventListener('dragleave', () => dropZone.classList.remove('border-primary-500'));
   dropZone?.addEventListener('drop', (e) => {
     e.preventDefault();
-    dropZone.classList.remove('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/20');
-    const files = Array.from(e.dataTransfer?.files || []);
-    handleFiles(files);
+    dropZone.classList.remove('border-primary-500');
+    handleFiles(Array.from(e.dataTransfer?.files || []));
   });
-
   fileInput?.addEventListener('change', () => {
-    const files = Array.from(fileInput.files || []);
-    handleFiles(files);
+    handleFiles(Array.from(fileInput.files || []));
     fileInput.value = '';
   });
 
-  // Coller des images (Ctrl+V / Cmd+V)
+  // Coller des images
   document.addEventListener('paste', (e) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-
-    const imageFiles: File[] = [];
-    for (const item of items) {
+    const imageFiles = [];
+    for (const item of (e.clipboardData?.items || [])) {
       if (item.type.startsWith('image/')) {
         const file = item.getAsFile();
         if (file) imageFiles.push(file);
       }
     }
-
     if (imageFiles.length > 0) {
       e.preventDefault();
       handleFiles(imageFiles);
     }
   });
 
-  function handleFiles(files: File[]) {
-    const validFiles = files.filter(file => {
-      if (!file.type.startsWith('image/')) {
-        alert(`${file.name} n'est pas une image valide`);
-        return false;
-      }
-      if (file.size > MAX_FILE_SIZE) {
-        alert(`${file.name} dépasse la taille maximale de 10 Mo`);
-        return false;
-      }
-      return true;
-    });
+  function handleFiles(files) {
+    const validFiles = files.filter(f => f.type.startsWith('image/') && f.size <= MAX_FILE_SIZE);
+    const remaining = MAX_IMAGES - images.length;
 
-    const remainingSlots = MAX_IMAGES - images.length;
-    if (validFiles.length > remainingSlots) {
-      alert(`Vous ne pouvez ajouter que ${remainingSlots} image(s) supplémentaire(s)`);
-    }
-
-    validFiles.slice(0, remainingSlots).forEach(file => {
+    validFiles.slice(0, remaining).forEach(file => {
       const reader = new FileReader();
       reader.onload = (e) => {
-        images.push({
-          file,
-          preview: e.target?.result as string,
-          alt: '',
-        });
+        images.push({ file, preview: e.target.result, alt: '' });
         renderImagePreviews();
       };
       reader.readAsDataURL(file);
@@ -248,90 +295,75 @@ const baseUrl = import.meta.env.BASE_URL;
 
   function renderImagePreviews() {
     if (!imagePreview) return;
-
     if (images.length === 0) {
       imagePreview.classList.add('hidden');
       imagePreview.innerHTML = '';
       return;
     }
-
     imagePreview.classList.remove('hidden');
-    imagePreview.innerHTML = images.map((img, index) => `
+    imagePreview.innerHTML = images.map((img, i) => `
       <div class="relative group aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
         <img src="${img.preview}" alt="" class="w-full h-full object-cover" />
-        <button
-          type="button"
-          class="remove-image absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-          data-index="${index}"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+        <button type="button" class="remove-image absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100" data-index="${i}">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       </div>
     `).join('');
 
-    // Boutons de suppression
     document.querySelectorAll('.remove-image').forEach(btn => {
       btn.addEventListener('click', () => {
-        const index = parseInt(btn.getAttribute('data-index') || '0');
-        images.splice(index, 1);
+        images.splice(parseInt(btn.getAttribute('data-index')), 1);
         renderImagePreviews();
       });
     });
   }
 
-  // Soumission du formulaire
+  // Soumission
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const content = contentInput.value.trim();
-    if (!content) {
-      alert('Le contenu est requis');
-      return;
-    }
+    if (!content) { alert('Le contenu est requis'); return; }
 
-    const status = (document.querySelector('input[name="status"]:checked') as HTMLInputElement)?.value || 'published';
-    const scheduledDateInput = document.getElementById('scheduled-date') as HTMLInputElement;
+    const status = document.querySelector('input[name="status"]:checked')?.value || 'published';
+    const scheduledDateInput = document.getElementById('scheduled-date');
 
-    let publishedAt: Date;
+    let publishedAt = new Date();
     if (status === 'scheduled' && scheduledDateInput?.value) {
       publishedAt = new Date(scheduledDateInput.value);
-    } else {
-      publishedAt = new Date();
     }
 
-    // Désactiver le bouton
-    if (submitBtn) {
-      submitBtn.setAttribute('disabled', 'true');
-      submitBtn.innerHTML = `
-        <svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        Publication en cours...
-      `;
-    }
+    submitBtn.setAttribute('disabled', 'true');
+    submitBtn.innerHTML = `<svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Publication en cours...`;
 
     try {
-      const timestamp = generateTimestamp();
+      const timestamp = Date.now().toString();
+      const filesToCommit = [];
+      const uploadedImages = [];
 
-      // Upload des images
-      const uploadedImages: Array<{ src: string; alt: string }> = [];
+      // Préparer les images
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
         const ext = img.file.name.split('.').pop() || 'jpg';
         const imagePath = `public/images/posts/${timestamp}-${i}.${ext}`;
 
-        await uploadImage(imagePath, img.preview, `Ajout image ${i + 1} pour post ${timestamp}`);
+        // Extraire le contenu base64 (sans le préfixe data:image/...)
+        const base64Content = img.preview.split(',')[1];
+
+        filesToCommit.push({
+          path: imagePath,
+          content: base64Content,
+          encoding: 'base64',
+        });
+
         uploadedImages.push({
           src: `/images/posts/${timestamp}-${i}.${ext}`,
           alt: img.alt,
         });
       }
 
-      // Créer le fichier markdown
-      const frontmatter = [
+      // Préparer le fichier markdown
+      const markdown = [
         '---',
         `status: ${status}`,
         `publishedAt: ${publishedAt.toISOString()}`,
@@ -341,27 +373,21 @@ const baseUrl = import.meta.env.BASE_URL;
         content,
       ].join('\n');
 
-      await createOrUpdateFile(
-        `src/content/posts/${timestamp}.md`,
-        frontmatter,
-        `Nouveau post: ${content.slice(0, 50)}...`
-      );
+      filesToCommit.push({
+        path: `src/content/posts/${timestamp}.md`,
+        content: markdown,
+        encoding: 'utf-8',
+      });
 
-      // Rediriger vers le dashboard
+      // Créer tous les fichiers en un seul commit
+      await createFilesInSingleCommit(filesToCommit, `Nouveau post: ${content.slice(0, 50)}...`);
+
       window.location.href = `${baseUrl}/admin`;
     } catch (error) {
       console.error('Failed to create post:', error);
-      alert('Erreur lors de la création du post');
-
-      if (submitBtn) {
-        submitBtn.removeAttribute('disabled');
-        submitBtn.innerHTML = `
-          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-          </svg>
-          Publier
-        `;
-      }
+      alert('Erreur lors de la création: ' + error.message);
+      submitBtn.removeAttribute('disabled');
+      submitBtn.innerHTML = `<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>Publier`;
     }
   });
 </script>

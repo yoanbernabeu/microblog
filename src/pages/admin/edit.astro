@@ -2,6 +2,7 @@
 import AdminLayout from '@layouts/AdminLayout.astro';
 
 const baseUrl = import.meta.env.BASE_URL;
+const githubRepo = import.meta.env.PUBLIC_GITHUB_REPO || '';
 ---
 
 <AdminLayout title="Modifier le post">
@@ -115,53 +116,142 @@ const baseUrl = import.meta.env.BASE_URL;
   </div>
 </AdminLayout>
 
-<script>
-  import { getFileContent, createOrUpdateFile, uploadImage } from '@lib/github';
-
-  const baseUrl = import.meta.env.BASE_URL;
+<script define:vars={{ baseUrl, githubRepo }}>
+  const GITHUB_REPO = githubRepo;
+  const API_BASE = 'https://api.github.com';
   const MAX_IMAGES = 4;
   const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-  // Récupérer le timestamp depuis l'URL (?id=xxx)
+  // Récupérer le timestamp depuis l'URL
   const urlParams = new URLSearchParams(window.location.search);
   const timestamp = urlParams.get('id');
 
   if (!timestamp) {
     document.getElementById('loading-state')?.classList.add('hidden');
     document.getElementById('error-state')?.classList.remove('hidden');
-    document.getElementById('error-message')!.textContent = 'Aucun post spécifié';
+    document.getElementById('error-message').textContent = 'Aucun post spécifié';
   }
 
-  interface ImageData {
-    file?: File;
-    preview: string;
-    src?: string;
-    alt: string;
-    isExisting?: boolean;
+  function getToken() {
+    return sessionStorage.getItem('github_token');
   }
 
-  let images: ImageData[] = [];
-  let originalSha = '';
-  let originalContent = '';
+  function getHeaders() {
+    return {
+      'Authorization': `Bearer ${getToken()}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    };
+  }
 
-  const form = document.getElementById('post-form') as HTMLFormElement;
-  const loadingState = document.getElementById('loading-state');
-  const errorState = document.getElementById('error-state');
-  const contentInput = document.getElementById('content') as HTMLTextAreaElement;
-  const charCount = document.getElementById('char-count');
-  const dropZone = document.getElementById('drop-zone');
-  const fileInput = document.getElementById('file-input') as HTMLInputElement;
-  const imagePreview = document.getElementById('image-preview');
-  const schedulePicker = document.getElementById('schedule-picker');
-  const submitBtn = document.getElementById('submit-btn');
+  // Récupérer le contenu d'un fichier
+  async function getFileContent(path) {
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/contents/${path}`, {
+      headers: getHeaders()
+    });
+    if (!response.ok) throw new Error('Fichier non trouvé');
+    const file = await response.json();
+    return { content: atob(file.content), sha: file.sha };
+  }
 
-  function parseFrontmatter(content: string): { data: Record<string, unknown>; body: string } {
+  // Créer un blob
+  async function createBlob(content, encoding = 'utf-8') {
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/git/blobs`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ content, encoding }),
+    });
+    if (!response.ok) throw new Error('Erreur création blob');
+    return response.json();
+  }
+
+  // Obtenir la référence HEAD
+  async function getRef(branch = 'main') {
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/git/ref/heads/${branch}`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) throw new Error('Erreur récupération ref');
+    return response.json();
+  }
+
+  // Obtenir un commit
+  async function getCommit(sha) {
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/git/commits/${sha}`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) throw new Error('Erreur récupération commit');
+    return response.json();
+  }
+
+  // Créer un tree
+  async function createTree(baseTreeSha, files) {
+    const tree = files.map(f => ({
+      path: f.path,
+      mode: '100644',
+      type: 'blob',
+      sha: f.sha,
+    }));
+
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/git/trees`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ base_tree: baseTreeSha, tree }),
+    });
+    if (!response.ok) throw new Error('Erreur création tree');
+    return response.json();
+  }
+
+  // Créer un commit
+  async function createCommit(message, treeSha, parentSha) {
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/git/commits`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ message, tree: treeSha, parents: [parentSha] }),
+    });
+    if (!response.ok) throw new Error('Erreur création commit');
+    return response.json();
+  }
+
+  // Mettre à jour la référence
+  async function updateRef(sha, branch = 'main') {
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/git/refs/heads/${branch}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ sha }),
+    });
+    if (!response.ok) throw new Error('Erreur mise à jour ref');
+    return response.json();
+  }
+
+  // Créer plusieurs fichiers en un seul commit
+  async function createFilesInSingleCommit(files, message) {
+    const blobs = await Promise.all(
+      files.map(async (f) => {
+        const blob = await createBlob(f.content, f.encoding || 'utf-8');
+        return { path: f.path, sha: blob.sha };
+      })
+    );
+
+    const ref = await getRef('main');
+    const latestCommitSha = ref.object.sha;
+    const latestCommit = await getCommit(latestCommitSha);
+    const baseTreeSha = latestCommit.tree.sha;
+
+    const newTree = await createTree(baseTreeSha, blobs);
+    const newCommit = await createCommit(message, newTree.sha, latestCommitSha);
+    await updateRef(newCommit.sha, 'main');
+
+    return newCommit;
+  }
+
+  // Parser le frontmatter
+  function parseFrontmatter(content) {
     const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
     if (!match) return { data: {}, body: content };
 
     const frontmatter = match[1];
     const body = match[2];
-    const data: Record<string, unknown> = {};
+    const data = {};
 
     frontmatter.split('\n').forEach(line => {
       const colonIndex = line.indexOf(':');
@@ -179,32 +269,45 @@ const baseUrl = import.meta.env.BASE_URL;
     return { data, body };
   }
 
+  let images = [];
+  let originalPublishedAt = null;
+
+  const form = document.getElementById('post-form');
+  const loadingState = document.getElementById('loading-state');
+  const errorState = document.getElementById('error-state');
+  const contentInput = document.getElementById('content');
+  const charCount = document.getElementById('char-count');
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const imagePreview = document.getElementById('image-preview');
+  const schedulePicker = document.getElementById('schedule-picker');
+  const submitBtn = document.getElementById('submit-btn');
+
+  // Charger le post
   async function loadPost() {
     if (!timestamp) return;
 
     try {
-      const { content, sha } = await getFileContent(`src/content/posts/${timestamp}.md`);
-      originalSha = sha;
-      originalContent = content;
-
+      const { content } = await getFileContent(`src/content/posts/${timestamp}.md`);
       const { data, body } = parseFrontmatter(content);
 
       contentInput.value = body.trim();
       updateCharCount();
 
-      const statusValue = (data.status as string) || 'draft';
-      const statusRadio = document.querySelector(`input[name="status"][value="${statusValue}"]`) as HTMLInputElement;
+      const statusValue = data.status || 'draft';
+      const statusRadio = document.querySelector(`input[name="status"][value="${statusValue}"]`);
       if (statusRadio) statusRadio.checked = true;
 
       if (data.publishedAt) {
-        const date = new Date(data.publishedAt as string);
-        const scheduledDateInput = document.getElementById('scheduled-date') as HTMLInputElement;
-        if (scheduledDateInput) scheduledDateInput.value = date.toISOString().slice(0, 16);
+        originalPublishedAt = new Date(data.publishedAt);
+        const scheduledDateInput = document.getElementById('scheduled-date');
+        if (scheduledDateInput) scheduledDateInput.value = originalPublishedAt.toISOString().slice(0, 16);
       }
 
       if (statusValue === 'scheduled') schedulePicker?.classList.remove('hidden');
 
-      const existingImages = (data.images as Array<{ src: string; alt?: string }>) || [];
+      // Images existantes
+      const existingImages = data.images || [];
       images = existingImages.map(img => ({
         preview: `${baseUrl}${img.src}`,
         src: img.src,
@@ -234,32 +337,32 @@ const baseUrl = import.meta.env.BASE_URL;
 
   document.querySelectorAll('input[name="status"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
-      const target = e.target as HTMLInputElement;
-      schedulePicker?.classList.toggle('hidden', target.value !== 'scheduled');
+      schedulePicker?.classList.toggle('hidden', e.target.value !== 'scheduled');
     });
   });
 
+  // Drag & Drop
   dropZone?.addEventListener('click', () => fileInput?.click());
   dropZone?.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-primary-500'); });
-  dropZone?.addEventListener('dragleave', () => { dropZone.classList.remove('border-primary-500'); });
+  dropZone?.addEventListener('dragleave', () => dropZone.classList.remove('border-primary-500'));
   dropZone?.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('border-primary-500');
     handleFiles(Array.from(e.dataTransfer?.files || []));
   });
-
   fileInput?.addEventListener('change', () => {
     handleFiles(Array.from(fileInput.files || []));
     fileInput.value = '';
   });
 
-  function handleFiles(files: File[]) {
+  function handleFiles(files) {
     const validFiles = files.filter(f => f.type.startsWith('image/') && f.size <= MAX_FILE_SIZE);
-    const remainingSlots = MAX_IMAGES - images.length;
-    validFiles.slice(0, remainingSlots).forEach(file => {
+    const remaining = MAX_IMAGES - images.length;
+
+    validFiles.slice(0, remaining).forEach(file => {
       const reader = new FileReader();
       reader.onload = (e) => {
-        images.push({ file, preview: e.target?.result as string, alt: '', isExisting: false });
+        images.push({ file, preview: e.target.result, alt: '', isExisting: false });
         renderImagePreviews();
       };
       reader.readAsDataURL(file);
@@ -268,13 +371,16 @@ const baseUrl = import.meta.env.BASE_URL;
 
   function renderImagePreviews() {
     if (!imagePreview) return;
-    if (images.length === 0) { imagePreview.classList.add('hidden'); imagePreview.innerHTML = ''; return; }
-
+    if (images.length === 0) {
+      imagePreview.classList.add('hidden');
+      imagePreview.innerHTML = '';
+      return;
+    }
     imagePreview.classList.remove('hidden');
-    imagePreview.innerHTML = images.map((img, index) => `
+    imagePreview.innerHTML = images.map((img, i) => `
       <div class="relative group aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
         <img src="${img.preview}" alt="" class="w-full h-full object-cover" />
-        <button type="button" class="remove-image absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100" data-index="${index}">
+        <button type="button" class="remove-image absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100" data-index="${i}">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       </div>
@@ -282,12 +388,13 @@ const baseUrl = import.meta.env.BASE_URL;
 
     document.querySelectorAll('.remove-image').forEach(btn => {
       btn.addEventListener('click', () => {
-        images.splice(parseInt(btn.getAttribute('data-index') || '0'), 1);
+        images.splice(parseInt(btn.getAttribute('data-index')), 1);
         renderImagePreviews();
       });
     });
   }
 
+  // Soumission
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!timestamp) return;
@@ -295,49 +402,72 @@ const baseUrl = import.meta.env.BASE_URL;
     const content = contentInput.value.trim();
     if (!content) { alert('Le contenu est requis'); return; }
 
-    const status = (document.querySelector('input[name="status"]:checked') as HTMLInputElement)?.value || 'published';
-    const scheduledDateInput = document.getElementById('scheduled-date') as HTMLInputElement;
+    const status = document.querySelector('input[name="status"]:checked')?.value || 'published';
+    const scheduledDateInput = document.getElementById('scheduled-date');
 
-    let publishedAt: Date;
+    let publishedAt = originalPublishedAt || new Date();
     if (status === 'scheduled' && scheduledDateInput?.value) {
       publishedAt = new Date(scheduledDateInput.value);
-    } else {
-      const originalData = parseFrontmatter(originalContent).data;
-      publishedAt = originalData.publishedAt ? new Date(originalData.publishedAt as string) : new Date();
     }
 
-    if (submitBtn) {
-      submitBtn.setAttribute('disabled', 'true');
-      submitBtn.innerHTML = `<svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Enregistrement...`;
-    }
+    submitBtn.setAttribute('disabled', 'true');
+    submitBtn.innerHTML = `<svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Enregistrement...`;
 
     try {
-      const finalImages: Array<{ src: string; alt: string }> = [];
+      const filesToCommit = [];
+      const finalImages = [];
 
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
+
         if (img.isExisting && img.src) {
+          // Garder l'image existante (pas besoin de la re-committer)
           finalImages.push({ src: img.src, alt: img.alt });
         } else if (img.file) {
+          // Nouvelle image à uploader
           const ext = img.file.name.split('.').pop() || 'jpg';
           const imagePath = `public/images/posts/${timestamp}-${i}-${Date.now()}.${ext}`;
-          await uploadImage(imagePath, img.preview, `Ajout image pour post ${timestamp}`);
-          finalImages.push({ src: imagePath.replace('public', ''), alt: img.alt });
+          const base64Content = img.preview.split(',')[1];
+
+          filesToCommit.push({
+            path: imagePath,
+            content: base64Content,
+            encoding: 'base64',
+          });
+
+          finalImages.push({
+            src: `/images/posts/${timestamp}-${i}-${Date.now()}.${ext}`,
+            alt: img.alt,
+          });
         }
       }
 
-      const frontmatter = ['---', `status: ${status}`, `publishedAt: ${publishedAt.toISOString()}`, `images: ${JSON.stringify(finalImages)}`, '---', '', content].join('\n');
+      // Fichier markdown
+      const markdown = [
+        '---',
+        `status: ${status}`,
+        `publishedAt: ${publishedAt.toISOString()}`,
+        `images: ${JSON.stringify(finalImages)}`,
+        '---',
+        '',
+        content,
+      ].join('\n');
 
-      await createOrUpdateFile(`src/content/posts/${timestamp}.md`, frontmatter, `Mise à jour post: ${content.slice(0, 50)}...`, originalSha);
+      filesToCommit.push({
+        path: `src/content/posts/${timestamp}.md`,
+        content: markdown,
+        encoding: 'utf-8',
+      });
+
+      // Créer tous les fichiers en un seul commit
+      await createFilesInSingleCommit(filesToCommit, `Mise à jour post: ${content.slice(0, 50)}...`);
 
       window.location.href = `${baseUrl}/admin`;
     } catch (error) {
       console.error('Failed to update post:', error);
-      alert('Erreur lors de la mise à jour');
-      if (submitBtn) {
-        submitBtn.removeAttribute('disabled');
-        submitBtn.innerHTML = `<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>Enregistrer`;
-      }
+      alert('Erreur lors de la mise à jour: ' + error.message);
+      submitBtn.removeAttribute('disabled');
+      submitBtn.innerHTML = `<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>Enregistrer`;
     }
   });
 
