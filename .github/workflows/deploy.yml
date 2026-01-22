@@ -41,6 +41,8 @@ jobs:
 
       - name: Build Astro site
         run: npm run build
+        env:
+          PUBLIC_GITHUB_REPO: ${{ github.repository }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
