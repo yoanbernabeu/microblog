@@ -1,0 +1,82 @@
+---
+---
+
+<!-- Lightbox modal global -->
+<div
+  id="lightbox-modal"
+  class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/95 backdrop-blur-md p-4 sm:p-8"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Visualisation de l'image"
+>
+  <button
+    type="button"
+    class="absolute top-4 right-4 z-10 p-3 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all duration-200 hover:scale-110"
+    aria-label="Fermer"
+    id="lightbox-close"
+  >
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  </button>
+
+  <img
+    id="lightbox-image"
+    src=""
+    alt=""
+    class="max-w-[95vw] max-h-[95vh] object-contain rounded-lg shadow-2xl"
+  />
+</div>
+
+<script>
+  function initGlobalLightbox() {
+    const modal = document.getElementById('lightbox-modal');
+    const image = document.getElementById('lightbox-image') as HTMLImageElement;
+    const closeButton = document.getElementById('lightbox-close');
+
+    if (!modal || !image) return;
+
+    // Open lightbox on any image with data-lightbox-src
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const button = target.closest('[data-lightbox-src]');
+
+      if (button) {
+        const src = button.getAttribute('data-lightbox-src');
+        const alt = button.getAttribute('data-lightbox-alt') || '';
+
+        if (src) {
+          image.src = src;
+          image.alt = alt;
+          modal.classList.remove('hidden');
+          modal.classList.add('flex');
+          document.body.style.overflow = 'hidden';
+        }
+      }
+    });
+
+    // Close lightbox
+    const closeLightbox = () => {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      document.body.style.overflow = '';
+      image.src = '';
+    };
+
+    closeButton?.addEventListener('click', closeLightbox);
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeLightbox();
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+        closeLightbox();
+      }
+    });
+  }
+
+  initGlobalLightbox();
+  document.addEventListener('astro:after-swap', initGlobalLightbox);
+</script>

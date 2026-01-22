@@ -4,17 +4,17 @@ interface Props {
   title?: string;
 }
 
-const { videoId, title = 'Vidéo YouTube' } = Astro.props;
+const { videoId, title = 'Video YouTube' } = Astro.props;
 const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 ---
 
-<div class="mt-4 relative rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 aspect-video">
-  <!-- Thumbnail avec bouton play (chargement différé) -->
+<div class="mt-4 relative rounded-xl overflow-hidden bg-surface-100 dark:bg-surface-800 aspect-video max-w-md group/yt">
+  <!-- Thumbnail avec bouton play (chargement differe) -->
   <button
     type="button"
-    class="youtube-facade w-full h-full group"
+    class="youtube-facade w-full h-full"
     data-youtube-id={videoId}
-    aria-label={`Lire la vidéo : ${title}`}
+    aria-label={`Lire la video : ${title}`}
   >
     <img
       src={thumbnailUrl}
@@ -22,9 +22,9 @@ const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
       class="w-full h-full object-cover"
       loading="lazy"
     />
-    <div class="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
-      <div class="w-16 h-16 flex items-center justify-center rounded-full bg-red-600 text-white group-hover:bg-red-700 transition-colors">
-        <svg class="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24">
+    <div class="absolute inset-0 flex items-center justify-center bg-gradient-to-t from-black/40 to-transparent group-hover/yt:from-black/50 transition-all duration-300">
+      <div class="w-14 h-14 flex items-center justify-center rounded-full bg-red-600 text-white shadow-lg group-hover/yt:scale-110 transition-transform duration-300">
+        <svg class="w-6 h-6 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
           <path d="M8 5v14l11-7z" />
         </svg>
       </div>

@@ -18,18 +18,30 @@ const hashtags = Array.from(hashtagsMap.entries())
 const title = `Tous les tags - ${config.site.name}`;
 ---
 
-<BaseLayout title={title} description="Parcourez tous les hashtags utilisés sur ce microblog">
+<BaseLayout title={title} description="Parcourez tous les hashtags utilises sur ce microblog">
   <Header />
 
   <main id="main-content" class="flex-1">
     <div class="max-w-2xl mx-auto px-4 py-8">
-      <h1 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">
-        Tous les tags
-      </h1>
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-10 h-10 rounded-xl bg-primary-500/10 flex items-center justify-center">
+          <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-semibold text-surface-900 dark:text-white">
+            Tous les tags
+          </h1>
+          <p class="text-sm text-surface-500 dark:text-surface-400 font-mono">
+            {hashtags.length} tag{hashtags.length > 1 ? 's' : ''}
+          </p>
+        </div>
+      </div>
 
       {hashtags.length === 0 ? (
         <div class="card p-8 text-center">
-          <p class="text-slate-500 dark:text-slate-400">
+          <p class="text-surface-500 dark:text-surface-400">
             Aucun tag pour le moment.
           </p>
         </div>
@@ -39,10 +51,10 @@ const title = `Tous les tags - ${config.site.name}`;
             {hashtags.map(({ tag, count }) => (
               <a
                 href={`${baseUrl}/tag/${tag}`}
-                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-primary-100 hover:text-primary-700 dark:hover:bg-primary-900 dark:hover:text-primary-300 transition-colors"
+                class="group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-100 dark:bg-surface-800/50 text-surface-700 dark:text-surface-300 hover:bg-primary-500/10 hover:text-primary-600 dark:hover:bg-primary-500/10 dark:hover:text-primary-400 border border-transparent hover:border-primary-500/20 transition-all duration-200"
               >
-                <span class="hashtag">#{tag}</span>
-                <span class="text-xs text-slate-500 dark:text-slate-400">({count})</span>
+                <span class="text-primary-500 font-medium">#{tag}</span>
+                <span class="text-xs text-surface-400 font-mono bg-surface-200 dark:bg-surface-700 px-1.5 py-0.5 rounded-full group-hover:bg-primary-500/20 transition-colors">{count}</span>
               </a>
             ))}
           </div>

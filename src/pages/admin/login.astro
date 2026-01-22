@@ -5,6 +5,8 @@ import '../../styles/global.css';
 const config = getConfig();
 const baseUrl = import.meta.env.BASE_URL;
 const githubRepo = import.meta.env.PUBLIC_GITHUB_REPO || '';
+const githubClientId = import.meta.env.PUBLIC_GITHUB_CLIENT_ID || '';
+const githubProxyUrl = import.meta.env.PUBLIC_GITHUB_PROXY_URL || '';
 ---
 
 <!doctype html>
@@ -25,104 +27,405 @@ const githubRepo = import.meta.env.PUBLIC_GITHUB_REPO || '';
       })();
     </script>
   </head>
-  <body class="h-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center p-4">
-    <div class="w-full max-w-md">
-      <div class="card p-8">
-        <div class="text-center mb-8">
-          <h1 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-            Admin MicroBlog
-          </h1>
-          <p class="text-slate-500 dark:text-slate-400">
-            Connectez-vous pour gérer vos posts
-          </p>
-        </div>
+  <body class="h-full bg-surface-50 dark:bg-surface-950 flex items-center justify-center p-4 relative">
+    <!-- Background effects -->
+    <div class="fixed inset-0 opacity-30 pointer-events-none" style="background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px); background-size: 24px 24px;" aria-hidden="true"></div>
+    <div class="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+      <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/20 dark:bg-primary-500/10 rounded-full blur-3xl"></div>
+      <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-accent-500/20 dark:bg-accent-500/10 rounded-full blur-3xl"></div>
+    </div>
 
-        <!-- Message d'erreur -->
-        <div id="error-message" class="hidden mb-4 p-3 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm">
-        </div>
+    <div class="w-full max-w-md relative z-10">
+      <!-- Card principale -->
+      <div class="relative group">
+        <div class="absolute -inset-1 bg-gradient-to-r from-primary-500 to-accent-500 rounded-2xl opacity-20 group-hover:opacity-30 blur transition-all duration-500"></div>
+        <div class="relative bg-white/80 dark:bg-surface-900/80 backdrop-blur-xl rounded-2xl border border-surface-200/50 dark:border-surface-700/50 p-8 shadow-xl">
 
-        <!-- Formulaire de token -->
-        <form id="token-form" class="space-y-4">
-          <div>
-            <label for="github-token" class="label">
-              Token GitHub (Personal Access Token)
-            </label>
-            <input
-              type="password"
-              id="github-token"
-              name="token"
-              class="input"
-              placeholder="ghp_xxxxxxxxxxxx"
-              required
-            />
-            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              <a
-                href="https://github.com/settings/tokens/new?description=MicroBlog&scopes=repo"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="link"
-              >
-                Créer un token GitHub
-              </a>
-              avec les permissions "repo"
+          <!-- Header -->
+          <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 mb-4 shadow-lg shadow-primary-500/25">
+              <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <h1 class="text-2xl font-bold text-surface-900 dark:text-white mb-2">
+              Admin <span class="bg-gradient-to-r from-primary-500 to-accent-500 bg-clip-text text-transparent">MicroBlog</span>
+            </h1>
+            <p class="text-surface-500 dark:text-surface-400">
+              Connectez-vous pour gerer vos posts
             </p>
           </div>
 
-          <button type="submit" class="btn-primary w-full" id="submit-btn">
-            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-              <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
-            </svg>
-            Se connecter
-          </button>
-        </form>
+          <!-- Message d'erreur -->
+          <div id="error-message" class="hidden mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm">
+          </div>
 
-        <p class="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
-          Seul le propriétaire du repository peut accéder à l'admin.
-        </p>
+          <!-- Ecran 1: Choix de la methode -->
+          <div id="auth-choice" class="space-y-4">
+            <!-- Bouton OAuth (principal) -->
+            <button
+              type="button"
+              id="oauth-btn"
+              class="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 text-white font-semibold rounded-xl shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40 transition-all duration-300 hover:scale-[1.02]"
+            >
+              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
+              </svg>
+              Se connecter avec GitHub
+            </button>
+
+            <div class="relative">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-surface-200 dark:border-surface-700"></div>
+              </div>
+              <div class="relative flex justify-center text-xs uppercase">
+                <span class="px-2 bg-white dark:bg-surface-900 text-surface-400">ou</span>
+              </div>
+            </div>
+
+            <!-- Bouton Token manuel (secondaire) -->
+            <button
+              type="button"
+              id="token-toggle-btn"
+              class="w-full flex items-center justify-center gap-2 px-6 py-3 text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700 font-medium rounded-xl transition-all duration-200"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+              Utiliser un token personnel
+            </button>
+          </div>
+
+          <!-- Ecran 2: Device Flow - Code utilisateur -->
+          <div id="device-code-screen" class="hidden">
+            <div class="text-center space-y-6">
+              <div class="space-y-2">
+                <p class="text-surface-600 dark:text-surface-400 text-sm">
+                  Entrez ce code sur GitHub :
+                </p>
+                <div class="relative group/code">
+                  <div class="absolute -inset-1 bg-gradient-to-r from-primary-500 to-accent-500 rounded-xl opacity-50 blur"></div>
+                  <div
+                    id="user-code"
+                    class="relative text-3xl font-mono font-bold tracking-[0.3em] bg-surface-900 dark:bg-black text-white py-4 px-6 rounded-xl cursor-pointer select-all"
+                    title="Cliquez pour copier"
+                  >
+                    ----·----
+                  </div>
+                </div>
+                <p id="copy-feedback" class="text-xs text-primary-500 opacity-0 transition-opacity">Copie !</p>
+              </div>
+
+              <a
+                id="verification-link"
+                href="https://github.com/login/device"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-2 px-6 py-3 bg-surface-900 dark:bg-white text-white dark:text-surface-900 font-semibold rounded-xl hover:opacity-90 transition-opacity"
+              >
+                Ouvrir GitHub
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+
+              <div class="flex items-center justify-center gap-2 text-sm text-surface-500 dark:text-surface-400">
+                <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span id="polling-status">En attente de l'autorisation...</span>
+              </div>
+
+              <button
+                type="button"
+                id="cancel-oauth-btn"
+                class="text-sm text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+
+          <!-- Ecran 3: Formulaire Token manuel -->
+          <div id="token-form-screen" class="hidden">
+            <form id="token-form" class="space-y-4">
+              <div>
+                <label for="github-token" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                  Token GitHub (Personal Access Token)
+                </label>
+                <input
+                  type="password"
+                  id="github-token"
+                  name="token"
+                  class="w-full px-4 py-3 bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-xl text-surface-900 dark:text-white placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all"
+                  placeholder="ghp_xxxxxxxxxxxx"
+                  required
+                />
+                <p class="mt-2 text-xs text-surface-500 dark:text-surface-400">
+                  <a
+                    href="https://github.com/settings/tokens/new?description=MicroBlog&scopes=repo"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-primary-500 hover:text-primary-600 hover:underline"
+                  >
+                    Creer un token GitHub
+                  </a>
+                  avec les permissions "repo"
+                </p>
+              </div>
+
+              <button type="submit" class="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 text-white font-semibold rounded-xl shadow-lg shadow-primary-500/25 transition-all duration-300" id="submit-btn">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+                Se connecter
+              </button>
+            </form>
+
+            <button
+              type="button"
+              id="back-to-choice-btn"
+              class="w-full mt-4 text-sm text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+            >
+              &larr; Retour
+            </button>
+          </div>
+
+          <p class="mt-6 text-center text-xs text-surface-400">
+            Seul le proprietaire du repository peut acceder a l'admin.
+          </p>
+        </div>
       </div>
 
-      <p class="mt-4 text-center">
+      <p class="mt-6 text-center">
         <a
           href={baseUrl || '/'}
-          class="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+          class="text-sm text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200 transition-colors"
         >
           &larr; Retour au site
         </a>
       </p>
     </div>
 
-    <script define:vars={{ baseUrl, githubRepo }}>
+    <script define:vars={{ baseUrl, githubRepo, githubClientId, githubProxyUrl }}>
       const GITHUB_REPO = githubRepo;
+      const GITHUB_CLIENT_ID = githubClientId;
+      const GITHUB_PROXY_URL = githubProxyUrl;
 
-      // Vérifier si déjà connecté
+      // Elements
+      const authChoice = document.getElementById('auth-choice');
+      const deviceCodeScreen = document.getElementById('device-code-screen');
+      const tokenFormScreen = document.getElementById('token-form-screen');
+      const errorMessage = document.getElementById('error-message');
+
+      const oauthBtn = document.getElementById('oauth-btn');
+      const tokenToggleBtn = document.getElementById('token-toggle-btn');
+      const backToChoiceBtn = document.getElementById('back-to-choice-btn');
+      const cancelOauthBtn = document.getElementById('cancel-oauth-btn');
+
+      const userCodeEl = document.getElementById('user-code');
+      const verificationLink = document.getElementById('verification-link');
+      const pollingStatus = document.getElementById('polling-status');
+      const copyFeedback = document.getElementById('copy-feedback');
+
+      const tokenForm = document.getElementById('token-form');
+      const submitBtn = document.getElementById('submit-btn');
+
+      let cancelPolling = null;
+
+      // Verifier si deja connecte
       if (sessionStorage.getItem('github_token')) {
         window.location.href = baseUrl + '/admin';
       }
 
-      const form = document.getElementById('token-form');
-      const errorMessage = document.getElementById('error-message');
-      const submitBtn = document.getElementById('submit-btn');
+      // Utilitaires d'affichage
+      function showScreen(screen) {
+        authChoice.classList.add('hidden');
+        deviceCodeScreen.classList.add('hidden');
+        tokenFormScreen.classList.add('hidden');
+        screen.classList.remove('hidden');
+      }
 
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
+      function showError(message) {
+        errorMessage.textContent = message;
+        errorMessage.classList.remove('hidden');
+      }
 
-        const formData = new FormData(form);
-        const token = formData.get('token');
+      function hideError() {
+        errorMessage.classList.add('hidden');
+      }
 
-        if (!token) return;
+      // =====================
+      // OAuth Device Flow
+      // =====================
 
-        // Loading state
-        submitBtn.setAttribute('disabled', 'true');
-        submitBtn.innerHTML = `
-          <svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+      async function requestDeviceCode() {
+        const proxyBase = GITHUB_PROXY_URL?.replace(/\/+$/, ''); // Remove trailing slashes
+        const url = proxyBase
+          ? `${proxyBase}/device/code`
+          : 'https://github.com/login/device/code';
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            client_id: GITHUB_CLIENT_ID,
+            scope: 'repo',
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.text();
+          throw new Error(`Erreur GitHub: ${error}`);
+        }
+
+        return response.json();
+      }
+
+      async function pollForToken(deviceCode) {
+        const proxyBase = GITHUB_PROXY_URL?.replace(/\/+$/, ''); // Remove trailing slashes
+        const url = proxyBase
+          ? `${proxyBase}/oauth/access_token`
+          : 'https://github.com/login/oauth/access_token';
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            client_id: GITHUB_CLIENT_ID,
+            device_code: deviceCode,
+            grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.error === 'authorization_pending') {
+          return null;
+        }
+
+        if (data.error === 'slow_down') {
+          return null;
+        }
+
+        if (data.error === 'expired_token') {
+          throw new Error('Le code a expire. Veuillez recommencer.');
+        }
+
+        if (data.error === 'access_denied') {
+          throw new Error('Acces refuse par l\'utilisateur.');
+        }
+
+        if (data.error) {
+          throw new Error(data.error_description || data.error);
+        }
+
+        if (data.access_token) {
+          return data.access_token;
+        }
+
+        return null;
+      }
+
+      async function startDeviceFlow() {
+        hideError();
+        oauthBtn.disabled = true;
+        oauthBtn.innerHTML = `
+          <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          Vérification...
+          Initialisation...
         `;
 
         try {
-          // Vérifier que le token est valide en récupérant l'utilisateur
+          const deviceCodeResponse = await requestDeviceCode();
+
+          // Afficher le code
+          userCodeEl.textContent = deviceCodeResponse.user_code;
+          verificationLink.href = deviceCodeResponse.verification_uri;
+          showScreen(deviceCodeScreen);
+
+          // Commencer le polling
+          let cancelled = false;
+          const interval = (deviceCodeResponse.interval || 5) * 1000;
+          const expiresAt = Date.now() + deviceCodeResponse.expires_in * 1000;
+
+          cancelPolling = () => {
+            cancelled = true;
+          };
+
+          const poll = async () => {
+            if (cancelled) return;
+
+            if (Date.now() > expiresAt) {
+              showError('Le code a expire. Veuillez recommencer.');
+              showScreen(authChoice);
+              resetOAuthButton();
+              return;
+            }
+
+            try {
+              const token = await pollForToken(deviceCodeResponse.device_code);
+
+              if (token) {
+                pollingStatus.textContent = 'Autorisation recue !';
+                await verifyAndLogin(token);
+                return;
+              }
+
+              // Continue polling
+              setTimeout(poll, interval);
+            } catch (error) {
+              showError(error.message);
+              showScreen(authChoice);
+              resetOAuthButton();
+            }
+          };
+
+          setTimeout(poll, interval);
+
+        } catch (error) {
+          showError(error.message || 'Erreur lors de l\'initialisation');
+          resetOAuthButton();
+        }
+      }
+
+      function resetOAuthButton() {
+        oauthBtn.disabled = false;
+        oauthBtn.innerHTML = `
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
+          </svg>
+          Se connecter avec GitHub
+        `;
+      }
+
+      // Copier le code au clic
+      userCodeEl?.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(userCodeEl.textContent.replace('·', '-'));
+          copyFeedback.classList.remove('opacity-0');
+          setTimeout(() => copyFeedback.classList.add('opacity-0'), 1500);
+        } catch (e) {
+          // Fallback selection
+        }
+      });
+
+      // =====================
+      // Verification commune
+      // =====================
+
+      async function verifyAndLogin(token) {
+        try {
+          // Verifier l'utilisateur
           const userResponse = await fetch('https://api.github.com/user', {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -136,7 +439,7 @@ const githubRepo = import.meta.env.PUBLIC_GITHUB_REPO || '';
 
           const user = await userResponse.json();
 
-          // Vérifier l'accès au repo
+          // Verifier l'acces au repo
           const repoResponse = await fetch(`https://api.github.com/repos/${GITHUB_REPO}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -145,28 +448,93 @@ const githubRepo = import.meta.env.PUBLIC_GITHUB_REPO || '';
           });
 
           if (!repoResponse.ok) {
-            throw new Error('Vous n\'avez pas accès à ce repository');
+            throw new Error('Vous n\'avez pas acces a ce repository');
           }
 
-          // Stocker le token et rediriger
+          const repoData = await repoResponse.json();
+
+          // Verifier les permissions d'ecriture
+          if (!repoData.permissions?.push) {
+            throw new Error('Vous n\'avez pas les droits d\'ecriture sur ce repository');
+          }
+
+          // Succes ! Stocker et rediriger
           sessionStorage.setItem('github_token', token);
           sessionStorage.setItem('github_user', JSON.stringify(user));
           window.location.href = baseUrl + '/admin';
 
         } catch (error) {
-          // Afficher l'erreur
-          errorMessage.textContent = error.message || 'Erreur de connexion';
-          errorMessage.classList.remove('hidden');
+          throw error;
+        }
+      }
 
-          // Reset button
-          submitBtn.removeAttribute('disabled');
+      // =====================
+      // Token manuel
+      // =====================
+
+      tokenForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideError();
+
+        const formData = new FormData(tokenForm);
+        const token = formData.get('token');
+
+        if (!token) return;
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `
+          <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Verification...
+        `;
+
+        try {
+          await verifyAndLogin(token);
+        } catch (error) {
+          showError(error.message || 'Erreur de connexion');
+          submitBtn.disabled = false;
           submitBtn.innerHTML = `
-            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-              <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
             </svg>
             Se connecter
           `;
         }
+      });
+
+      // =====================
+      // Navigation
+      // =====================
+
+      oauthBtn?.addEventListener('click', () => {
+        if (!GITHUB_CLIENT_ID) {
+          showError('OAuth non configure (CLIENT_ID manquant). Utilisez un token personnel.');
+          return;
+        }
+        if (!GITHUB_PROXY_URL) {
+          showError('OAuth non configure (PROXY_URL manquant). Utilisez un token personnel.');
+          return;
+        }
+        startDeviceFlow();
+      });
+
+      tokenToggleBtn?.addEventListener('click', () => {
+        hideError();
+        showScreen(tokenFormScreen);
+      });
+
+      backToChoiceBtn?.addEventListener('click', () => {
+        hideError();
+        showScreen(authChoice);
+      });
+
+      cancelOauthBtn?.addEventListener('click', () => {
+        if (cancelPolling) cancelPolling();
+        hideError();
+        showScreen(authChoice);
+        resetOAuthButton();
       });
     </script>
   </body>

@@ -1,111 +1,192 @@
 /**
- * Module d'authentification GitHub OAuth (PKCE flow côté client)
+ * Module d'authentification GitHub OAuth
+ * Supporte : Device Flow (recommande) et Personal Access Token (fallback)
  */
 
 const GITHUB_CLIENT_ID = import.meta.env.PUBLIC_GITHUB_CLIENT_ID || '';
 const GITHUB_REPO = import.meta.env.PUBLIC_GITHUB_REPO || '';
 
-// Générer un code verifier pour PKCE
-export function generateCodeVerifier(): string {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  return base64UrlEncode(array);
+export interface DeviceCodeResponse {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  expires_in: number;
+  interval: number;
 }
 
-// Générer le code challenge à partir du verifier
-export async function generateCodeChallenge(verifier: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(verifier);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return base64UrlEncode(new Uint8Array(digest));
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  scope: string;
 }
 
-function base64UrlEncode(array: Uint8Array): string {
-  return btoa(String.fromCharCode(...array))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+export interface GitHubUser {
+  login: string;
+  id: number;
+  avatar_url: string;
+  name: string | null;
+  email: string | null;
 }
 
-// Construire l'URL d'autorisation GitHub
-export async function getAuthorizationUrl(): Promise<string> {
-  const codeVerifier = generateCodeVerifier();
-  const codeChallenge = await generateCodeChallenge(codeVerifier);
+// ============================================
+// Device Flow (OAuth sans secret cote client)
+// ============================================
 
-  // Stocker le verifier pour l'échange de token
-  sessionStorage.setItem('github_code_verifier', codeVerifier);
-
-  const params = new URLSearchParams({
-    client_id: GITHUB_CLIENT_ID,
-    redirect_uri: `${window.location.origin}${import.meta.env.BASE_URL}/admin/callback`,
-    scope: 'repo',
-    state: generateCodeVerifier(), // CSRF protection
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256',
+/**
+ * Demande un device code a GitHub
+ * L'utilisateur devra aller sur github.com/login/device et entrer le user_code
+ */
+export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
+  const response = await fetch('https://github.com/login/device/code', {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      client_id: GITHUB_CLIENT_ID,
+      scope: 'repo',
+    }),
   });
 
-  // Stocker le state pour vérification
-  sessionStorage.setItem('github_oauth_state', params.get('state') || '');
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to get device code: ${error}`);
+  }
 
-  return `https://github.com/login/oauth/authorize?${params.toString()}`;
+  return response.json();
 }
 
-// Échanger le code contre un token
-export async function exchangeCodeForToken(code: string, state: string): Promise<string | null> {
-  const storedState = sessionStorage.getItem('github_oauth_state');
-  const codeVerifier = sessionStorage.getItem('github_code_verifier');
+/**
+ * Poll GitHub pour verifier si l'utilisateur a autorise l'app
+ */
+export async function pollForToken(deviceCode: string): Promise<TokenResponse | null> {
+  const response = await fetch('https://github.com/login/oauth/access_token', {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      client_id: GITHUB_CLIENT_ID,
+      device_code: deviceCode,
+      grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+    }),
+  });
 
-  // Vérifier le state (CSRF)
-  if (state !== storedState) {
-    console.error('Invalid OAuth state');
-    return null;
+  const data = await response.json();
+
+  // Erreurs attendues pendant le polling
+  if (data.error === 'authorization_pending') {
+    return null; // L'utilisateur n'a pas encore autorise
   }
 
-  if (!codeVerifier) {
-    console.error('Missing code verifier');
-    return null;
+  if (data.error === 'slow_down') {
+    return null; // Trop de requetes, attendre plus
   }
+
+  if (data.error === 'expired_token') {
+    throw new Error('Le code a expire. Veuillez recommencer.');
+  }
+
+  if (data.error === 'access_denied') {
+    throw new Error('Acces refuse par l\'utilisateur.');
+  }
+
+  if (data.error) {
+    throw new Error(data.error_description || data.error);
+  }
+
+  if (data.access_token) {
+    return data as TokenResponse;
+  }
+
+  return null;
+}
+
+/**
+ * Lance le Device Flow complet avec polling
+ */
+export async function startDeviceFlow(
+  onUserCode: (code: string, url: string) => void,
+  onSuccess: (token: string) => void,
+  onError: (error: string) => void
+): Promise<() => void> {
+  let cancelled = false;
 
   try {
-    // Note: L'échange de token nécessite normalement un backend
-    // car GitHub n'accepte pas les requêtes CORS pour /login/oauth/access_token
-    // On utilise ici un proxy ou une fonction serverless
-    // Pour simplifier, on stocke le token manuellement dans l'interface
+    const deviceCodeResponse = await requestDeviceCode();
 
-    // Clean up
-    sessionStorage.removeItem('github_oauth_state');
-    sessionStorage.removeItem('github_code_verifier');
+    // Afficher le code a l'utilisateur
+    onUserCode(deviceCodeResponse.user_code, deviceCodeResponse.verification_uri);
 
-    // Retourner null - l'utilisateur devra entrer son token manuellement
-    return null;
+    // Polling
+    const interval = (deviceCodeResponse.interval || 5) * 1000;
+    const expiresAt = Date.now() + deviceCodeResponse.expires_in * 1000;
+
+    const poll = async () => {
+      if (cancelled) return;
+
+      if (Date.now() > expiresAt) {
+        onError('Le code a expire. Veuillez recommencer.');
+        return;
+      }
+
+      try {
+        const tokenResponse = await pollForToken(deviceCodeResponse.device_code);
+
+        if (tokenResponse) {
+          setToken(tokenResponse.access_token);
+          onSuccess(tokenResponse.access_token);
+          return;
+        }
+
+        // Continue polling
+        setTimeout(poll, interval);
+      } catch (error) {
+        onError(error instanceof Error ? error.message : 'Erreur inconnue');
+      }
+    };
+
+    // Start polling
+    setTimeout(poll, interval);
+
   } catch (error) {
-    console.error('Token exchange failed:', error);
-    return null;
+    onError(error instanceof Error ? error.message : 'Erreur lors de l\'initialisation');
   }
+
+  // Return cancel function
+  return () => {
+    cancelled = true;
+  };
 }
 
-// Stocker le token
+// ============================================
+// Token Management
+// ============================================
+
 export function setToken(token: string): void {
   sessionStorage.setItem('github_token', token);
 }
 
-// Récupérer le token
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
   return sessionStorage.getItem('github_token');
 }
 
-// Supprimer le token
 export function clearToken(): void {
   sessionStorage.removeItem('github_token');
+  sessionStorage.removeItem('github_user');
 }
 
-// Vérifier si l'utilisateur est authentifié
 export function isAuthenticated(): boolean {
   return !!getToken();
 }
 
-// Récupérer les infos de l'utilisateur GitHub
+// ============================================
+// GitHub API
+// ============================================
+
 export async function getGitHubUser(): Promise<GitHubUser | null> {
   const token = getToken();
   if (!token) return null;
@@ -132,25 +213,33 @@ export async function getGitHubUser(): Promise<GitHubUser | null> {
   }
 }
 
-// Vérifier si l'utilisateur est propriétaire du repo
-export async function isRepoOwner(): Promise<boolean> {
-  const user = await getGitHubUser();
-  if (!user) return false;
+export async function verifyRepoAccess(): Promise<boolean> {
+  const token = getToken();
+  if (!token || !GITHUB_REPO) return false;
 
-  const [owner] = GITHUB_REPO.split('/');
-  return user.login.toLowerCase() === owner.toLowerCase();
+  try {
+    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+    });
+
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
-// Déconnecter l'utilisateur
 export function logout(): void {
   clearToken();
   window.location.href = `${import.meta.env.BASE_URL}/admin/login`;
 }
 
-export interface GitHubUser {
-  login: string;
-  id: number;
-  avatar_url: string;
-  name: string | null;
-  email: string | null;
+export function getClientId(): string {
+  return GITHUB_CLIENT_ID;
+}
+
+export function getRepoName(): string {
+  return GITHUB_REPO;
 }

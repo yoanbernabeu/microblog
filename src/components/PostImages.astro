@@ -9,19 +9,19 @@ interface Props {
 const { images } = Astro.props;
 const baseUrl = import.meta.env.BASE_URL;
 
-// Grille adaptative selon le nombre d'images
+// Grille adaptative selon le nombre d'images - taille reduite
 const getGridClass = (count: number): string => {
   switch (count) {
     case 1:
-      return 'grid-cols-1';
+      return 'grid-cols-1 max-w-xs';
     case 2:
-      return 'grid-cols-2';
+      return 'grid-cols-2 max-w-sm';
     case 3:
-      return 'grid-cols-2';
+      return 'grid-cols-3 max-w-md';
     case 4:
-      return 'grid-cols-2';
+      return 'grid-cols-2 max-w-sm';
     default:
-      return 'grid-cols-2';
+      return 'grid-cols-2 max-w-sm';
   }
 };
 
@@ -29,101 +29,31 @@ const gridClass = getGridClass(images.length);
 ---
 
 {images.length > 0 && (
-  <div class={`mt-4 grid ${gridClass} gap-2 rounded-xl overflow-hidden`}>
+  <div class={`mt-4 grid ${gridClass} gap-1.5 rounded-xl overflow-hidden`}>
     {images.map((image, index) => {
       const imageSrc = image.src.startsWith('/') ? `${baseUrl}${image.src}` : image.src;
-      const isSpanning = images.length === 3 && index === 0;
 
       return (
         <button
           type="button"
-          class={`relative overflow-hidden bg-slate-100 dark:bg-slate-800 aspect-square ${isSpanning ? 'row-span-2' : ''}`}
+          class="relative overflow-hidden bg-surface-100 dark:bg-surface-800 rounded-lg group/img aspect-square cursor-zoom-in"
           data-lightbox-src={imageSrc}
           data-lightbox-alt={image.alt || ''}
-          aria-label={image.alt || `Image ${index + 1}`}
+          aria-label={image.alt || `Agrandir image ${index + 1}`}
         >
           <img
             src={imageSrc}
             alt={image.alt || ''}
-            class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+            class="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
             loading="lazy"
           />
+          <div class="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors duration-300 flex items-center justify-center">
+            <svg class="w-6 h-6 text-white opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+            </svg>
+          </div>
         </button>
       );
     })}
   </div>
 )}
-
-<!-- Lightbox modal -->
-<div
-  id="lightbox-modal"
-  class="fixed inset-0 z-50 hidden items-center justify-center bg-black/90 p-4"
-  role="dialog"
-  aria-modal="true"
-  aria-label="Visualisation de l'image"
->
-  <button
-    type="button"
-    class="absolute top-4 right-4 text-white hover:text-slate-300 transition-colors"
-    aria-label="Fermer"
-    data-lightbox-close
-  >
-    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  </button>
-  <img
-    id="lightbox-image"
-    src=""
-    alt=""
-    class="max-w-full max-h-full object-contain"
-  />
-</div>
-
-<script>
-  function initLightbox() {
-    const modal = document.getElementById('lightbox-modal');
-    const image = document.getElementById('lightbox-image') as HTMLImageElement;
-    const closeButton = document.querySelector('[data-lightbox-close]');
-
-    if (!modal || !image) return;
-
-    // Open lightbox
-    document.querySelectorAll('[data-lightbox-src]').forEach(button => {
-      button.addEventListener('click', () => {
-        const src = button.getAttribute('data-lightbox-src');
-        const alt = button.getAttribute('data-lightbox-alt') || '';
-
-        if (src) {
-          image.src = src;
-          image.alt = alt;
-          modal.classList.remove('hidden');
-          modal.classList.add('flex');
-          document.body.style.overflow = 'hidden';
-        }
-      });
-    });
-
-    // Close lightbox
-    const closeLightbox = () => {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-      document.body.style.overflow = '';
-    };
-
-    closeButton?.addEventListener('click', closeLightbox);
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeLightbox();
-    });
-
-    // Close on Escape
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
-        closeLightbox();
-      }
-    });
-  }
-
-  initLightbox();
-  document.addEventListener('astro:after-swap', initLightbox);
-</script>

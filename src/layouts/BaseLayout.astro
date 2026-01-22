@@ -1,6 +1,7 @@
 ---
 import { getConfig } from '@lib/config';
 import '../styles/global.css';
+import Lightbox from '@components/Lightbox.astro';
 
 interface Props {
   title?: string;
@@ -64,11 +65,23 @@ const baseUrl = import.meta.env.BASE_URL;
       })();
     </script>
   </head>
-  <body class="h-full bg-slate-50 dark:bg-slate-900 transition-colors">
+  <body class="h-full bg-surface-50 dark:bg-surface-950 transition-colors relative">
+    <!-- Background pattern -->
+    <div class="fixed inset-0 opacity-40 pointer-events-none" style="background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px); background-size: 24px 24px;" aria-hidden="true"></div>
+    <div class="fixed inset-0 opacity-40 pointer-events-none dark:block hidden" style="background-image: linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 24px 24px;" aria-hidden="true"></div>
+
+    <!-- Gradient orbs -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+      <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/10 dark:bg-primary-500/5 rounded-full blur-3xl"></div>
+      <div class="absolute top-1/2 -left-40 w-80 h-80 bg-accent-500/10 dark:bg-accent-500/5 rounded-full blur-3xl"></div>
+    </div>
+
     <a href="#main-content" class="skip-link">Aller au contenu principal</a>
 
-    <div class="min-h-full flex flex-col">
+    <div class="min-h-full flex flex-col relative z-10">
       <slot />
     </div>
+
+    <Lightbox />
   </body>
 </html>

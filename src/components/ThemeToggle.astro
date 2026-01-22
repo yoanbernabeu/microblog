@@ -4,10 +4,10 @@
 <button
   id="theme-toggle"
   type="button"
-  class="p-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-  aria-label="Basculer le thème"
+  class="p-3 text-surface-500 hover:text-white bg-surface-100 dark:bg-surface-800 hover:bg-gradient-to-br hover:from-primary-500 hover:to-accent-500 rounded-xl transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-primary-500/25"
+  aria-label="Changer de theme"
 >
-  <!-- Icône soleil (mode clair) -->
+  <!-- Sun icon (show in dark mode) -->
   <svg
     class="w-5 h-5 hidden dark:block"
     fill="none"
@@ -22,7 +22,7 @@
       d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
     />
   </svg>
-  <!-- Icône lune (mode sombre) -->
+  <!-- Moon icon (show in light mode) -->
   <svg
     class="w-5 h-5 block dark:hidden"
     fill="none"
@@ -50,9 +50,6 @@
     });
   }
 
-  // Run on initial load
   initThemeToggle();
-
-  // Re-run after Astro page transitions
   document.addEventListener('astro:after-swap', initThemeToggle);
 </script>

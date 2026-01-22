@@ -6,29 +6,52 @@ const baseUrl = import.meta.env.BASE_URL;
 const currentYear = new Date().getFullYear();
 ---
 
-<footer class="mt-auto border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-  <div class="max-w-2xl mx-auto px-4 py-6">
-    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500 dark:text-slate-400">
-      <p>
-        &copy; {currentYear} {config.author.name}
-      </p>
+<footer class="relative mt-auto overflow-hidden">
+  <!-- Decorative top border -->
+  <div class="h-px bg-gradient-to-r from-transparent via-primary-500 to-transparent"></div>
 
-      <nav class="flex items-center gap-4" aria-label="Liens du pied de page">
+  <!-- Background glow -->
+  <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-96 h-32 bg-primary-500/10 rounded-full blur-3xl"></div>
+
+  <div class="relative max-w-2xl mx-auto px-4 py-8">
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-6">
+      <!-- Copyright -->
+      <div class="flex items-center gap-3">
+        <div class="relative">
+          <div class="w-2 h-2 rounded-full bg-primary-500"></div>
+          <div class="absolute inset-0 w-2 h-2 rounded-full bg-primary-500 animate-ping"></div>
+        </div>
+        <p class="text-sm font-mono text-surface-500 dark:text-surface-400">
+          <span class="text-primary-500">&copy;</span> {currentYear} <span class="font-semibold text-surface-700 dark:text-surface-300">{config.author.name}</span>
+        </p>
+      </div>
+
+      <!-- Links -->
+      <nav class="flex items-center gap-1" aria-label="Liens du pied de page">
         <a
           href={`${baseUrl}/rss.xml`}
-          class="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+          class="group relative px-4 py-2 text-sm font-medium text-surface-500 dark:text-surface-400 hover:text-white rounded-full overflow-hidden transition-colors"
         >
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M6.18 15.64a2.18 2.18 0 1 1 0 4.36 2.18 2.18 0 0 1 0-4.36m12.26 4.36A14.18 14.18 0 0 0 4 5.56v2.83a11.35 11.35 0 0 1 11.35 11.35h3.09m-5.66 0A8.52 8.52 0 0 0 4 11.21v2.83a5.68 5.68 0 0 1 5.68 5.68h3.1z"/>
-          </svg>
-          RSS
+          <span class="absolute inset-0 bg-gradient-to-r from-orange-500 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+          <span class="relative flex items-center gap-2">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6.18 15.64a2.18 2.18 0 1 1 0 4.36 2.18 2.18 0 0 1 0-4.36m12.26 4.36A14.18 14.18 0 0 0 4 5.56v2.83a11.35 11.35 0 0 1 11.35 11.35h3.09m-5.66 0A8.52 8.52 0 0 0 4 11.21v2.83a5.68 5.68 0 0 1 5.68 5.68h3.1z"/>
+            </svg>
+            RSS
+          </span>
         </a>
 
         <a
           href={`${baseUrl}/tags`}
-          class="hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+          class="group relative px-4 py-2 text-sm font-medium text-surface-500 dark:text-surface-400 hover:text-white rounded-full overflow-hidden transition-colors"
         >
-          Tags
+          <span class="absolute inset-0 bg-gradient-to-r from-primary-500 to-accent-500 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+          <span class="relative flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+            Tags
+          </span>
         </a>
       </nav>
     </div>
