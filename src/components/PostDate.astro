@@ -1,0 +1,22 @@
+---
+import { formatPostDate, formatDatetime } from '@lib/posts';
+
+interface Props {
+  date: Date;
+}
+
+const { date } = Astro.props;
+const displayDate = formatPostDate(date);
+const datetime = formatDatetime(date);
+---
+
+<time
+  datetime={datetime}
+  class="text-sm text-slate-500 dark:text-slate-400"
+  title={date.toLocaleString('fr-FR', {
+    dateStyle: 'full',
+    timeStyle: 'short'
+  })}
+>
+  {displayDate}
+</time>

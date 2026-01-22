@@ -1,0 +1,59 @@
+---
+interface Props {
+  videoId: string;
+  title?: string;
+}
+
+const { videoId, title = 'Vidéo YouTube' } = Astro.props;
+const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+---
+
+<div class="mt-4 relative rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 aspect-video">
+  <!-- Thumbnail avec bouton play (chargement différé) -->
+  <button
+    type="button"
+    class="youtube-facade w-full h-full group"
+    data-youtube-id={videoId}
+    aria-label={`Lire la vidéo : ${title}`}
+  >
+    <img
+      src={thumbnailUrl}
+      alt={title}
+      class="w-full h-full object-cover"
+      loading="lazy"
+    />
+    <div class="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
+      <div class="w-16 h-16 flex items-center justify-center rounded-full bg-red-600 text-white group-hover:bg-red-700 transition-colors">
+        <svg class="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      </div>
+    </div>
+  </button>
+</div>
+
+<script>
+  function initYouTubeFacades() {
+    document.querySelectorAll('.youtube-facade').forEach(button => {
+      button.addEventListener('click', () => {
+        const videoId = button.getAttribute('data-youtube-id');
+        if (!videoId) return;
+
+        const iframe = document.createElement('iframe');
+        iframe.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1`;
+        iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+        iframe.allowFullscreen = true;
+        iframe.className = 'absolute inset-0 w-full h-full';
+
+        const container = button.parentElement;
+        if (container) {
+          container.innerHTML = '';
+          container.appendChild(iframe);
+        }
+      });
+    }, { once: true });
+  }
+
+  initYouTubeFacades();
+  document.addEventListener('astro:after-swap', initYouTubeFacades);
+</script>

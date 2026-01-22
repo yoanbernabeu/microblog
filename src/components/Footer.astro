@@ -1,0 +1,36 @@
+---
+import { getConfig } from '@lib/config';
+
+const config = getConfig();
+const baseUrl = import.meta.env.BASE_URL;
+const currentYear = new Date().getFullYear();
+---
+
+<footer class="mt-auto border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+  <div class="max-w-2xl mx-auto px-4 py-6">
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500 dark:text-slate-400">
+      <p>
+        &copy; {currentYear} {config.author.name}
+      </p>
+
+      <nav class="flex items-center gap-4" aria-label="Liens du pied de page">
+        <a
+          href={`${baseUrl}/rss.xml`}
+          class="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+        >
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6.18 15.64a2.18 2.18 0 1 1 0 4.36 2.18 2.18 0 0 1 0-4.36m12.26 4.36A14.18 14.18 0 0 0 4 5.56v2.83a11.35 11.35 0 0 1 11.35 11.35h3.09m-5.66 0A8.52 8.52 0 0 0 4 11.21v2.83a5.68 5.68 0 0 1 5.68 5.68h3.1z"/>
+          </svg>
+          RSS
+        </a>
+
+        <a
+          href={`${baseUrl}/tags`}
+          class="hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+        >
+          Tags
+        </a>
+      </nav>
+    </div>
+  </div>
+</footer>

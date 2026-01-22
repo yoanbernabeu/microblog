@@ -1,0 +1,298 @@
+---
+import AdminLayout from '@layouts/AdminLayout.astro';
+
+const baseUrl = import.meta.env.BASE_URL;
+---
+
+<AdminLayout title="Modifier le profil">
+  <div class="max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">
+      Modifier le profil
+    </h1>
+
+    <!-- Chargement -->
+    <div id="loading-state" class="card p-8 text-center">
+      <div class="inline-block w-8 h-8 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+      <p class="mt-2 text-slate-500 dark:text-slate-400">Chargement de la configuration...</p>
+    </div>
+
+    <!-- Erreur -->
+    <div id="error-state" class="hidden card p-8 text-center">
+      <div class="text-4xl mb-2">⚠️</div>
+      <p class="text-slate-700 dark:text-slate-300" id="error-message">Erreur de chargement</p>
+      <button type="button" id="retry-btn" class="btn-secondary mt-4">
+        Réessayer
+      </button>
+    </div>
+
+    <!-- Formulaire -->
+    <form id="profile-form" class="hidden space-y-6">
+      <!-- Informations de base -->
+      <div class="card p-6 space-y-4">
+        <h2 class="font-semibold text-slate-900 dark:text-white">Informations de base</h2>
+
+        <div>
+          <label for="name" class="label">Nom</label>
+          <input type="text" id="name" name="name" class="input" required />
+        </div>
+
+        <div>
+          <label for="bio" class="label">Bio</label>
+          <textarea id="bio" name="bio" class="textarea" rows="2"></textarea>
+        </div>
+
+        <div>
+          <label for="avatar" class="label">URL de l'avatar</label>
+          <input type="text" id="avatar" name="avatar" class="input" placeholder="/images/avatar.jpg" />
+        </div>
+      </div>
+
+      <!-- Liens sociaux -->
+      <div class="card p-6 space-y-4">
+        <h2 class="font-semibold text-slate-900 dark:text-white">Réseaux sociaux</h2>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="twitter" class="label">Twitter / X</label>
+            <input type="url" id="twitter" name="twitter" class="input" placeholder="https://twitter.com/..." />
+          </div>
+          <div>
+            <label for="github" class="label">GitHub</label>
+            <input type="url" id="github" name="github" class="input" placeholder="https://github.com/..." />
+          </div>
+          <div>
+            <label for="mastodon" class="label">Mastodon</label>
+            <input type="url" id="mastodon" name="mastodon" class="input" placeholder="https://mastodon.social/@..." />
+          </div>
+          <div>
+            <label for="linkedin" class="label">LinkedIn</label>
+            <input type="url" id="linkedin" name="linkedin" class="input" placeholder="https://linkedin.com/in/..." />
+          </div>
+          <div>
+            <label for="bluesky" class="label">Bluesky</label>
+            <input type="url" id="bluesky" name="bluesky" class="input" placeholder="https://bsky.app/profile/..." />
+          </div>
+        </div>
+      </div>
+
+      <!-- Liens personnalisés -->
+      <div class="card p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="font-semibold text-slate-900 dark:text-white">Liens personnalisés</h2>
+          <button type="button" id="add-link" class="btn-ghost text-sm">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Ajouter
+          </button>
+        </div>
+
+        <div id="custom-links" class="space-y-3">
+          <!-- Les liens seront ajoutés ici dynamiquement -->
+        </div>
+      </div>
+
+      <!-- Boutons d'action -->
+      <div class="flex gap-3">
+        <button type="submit" id="submit-btn" class="btn-primary flex-1">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+          </svg>
+          Enregistrer
+        </button>
+      </div>
+    </form>
+  </div>
+</AdminLayout>
+
+<script>
+  import { getFileContent, createOrUpdateFile } from '@lib/github';
+  import yaml from 'js-yaml';
+
+  const baseUrl = import.meta.env.BASE_URL;
+
+  interface Config {
+    site: { name: string; description: string; language: string };
+    author: { name: string; bio: string; avatar: string };
+    social: Record<string, string>;
+    links: Array<{ label: string; url: string }>;
+    feed: { postsPerPage: number };
+  }
+
+  let originalSha = '';
+  let config: Config | null = null;
+  let customLinks: Array<{ label: string; url: string }> = [];
+
+  // Éléments DOM
+  const form = document.getElementById('profile-form') as HTMLFormElement;
+  const loadingState = document.getElementById('loading-state');
+  const errorState = document.getElementById('error-state');
+  const customLinksContainer = document.getElementById('custom-links');
+  const addLinkBtn = document.getElementById('add-link');
+  const submitBtn = document.getElementById('submit-btn');
+
+  // Charger la configuration
+  async function loadConfig() {
+    try {
+      const { content, sha } = await getFileContent('src/config.yml');
+      originalSha = sha;
+      config = yaml.load(content) as Config;
+
+      // Remplir le formulaire
+      (document.getElementById('name') as HTMLInputElement).value = config.author.name || '';
+      (document.getElementById('bio') as HTMLTextAreaElement).value = config.author.bio || '';
+      (document.getElementById('avatar') as HTMLInputElement).value = config.author.avatar || '';
+
+      // Réseaux sociaux
+      (document.getElementById('twitter') as HTMLInputElement).value = config.social?.twitter || '';
+      (document.getElementById('github') as HTMLInputElement).value = config.social?.github || '';
+      (document.getElementById('mastodon') as HTMLInputElement).value = config.social?.mastodon || '';
+      (document.getElementById('linkedin') as HTMLInputElement).value = config.social?.linkedin || '';
+      (document.getElementById('bluesky') as HTMLInputElement).value = config.social?.bluesky || '';
+
+      // Liens personnalisés
+      customLinks = config.links || [];
+      renderCustomLinks();
+
+      loadingState?.classList.add('hidden');
+      form?.classList.remove('hidden');
+    } catch (error) {
+      console.error('Failed to load config:', error);
+      loadingState?.classList.add('hidden');
+      errorState?.classList.remove('hidden');
+    }
+  }
+
+  function renderCustomLinks() {
+    if (!customLinksContainer) return;
+
+    customLinksContainer.innerHTML = customLinks.map((link, index) => `
+      <div class="flex gap-2 items-start" data-link-index="${index}">
+        <input
+          type="text"
+          class="input flex-1"
+          placeholder="Label"
+          value="${escapeHtml(link.label)}"
+          data-field="label"
+        />
+        <input
+          type="url"
+          class="input flex-1"
+          placeholder="https://..."
+          value="${escapeHtml(link.url)}"
+          data-field="url"
+        />
+        <button
+          type="button"
+          class="p-2 text-slate-400 hover:text-red-600 transition-colors"
+          data-remove-link="${index}"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    `).join('');
+
+    // Événements de mise à jour
+    customLinksContainer.querySelectorAll('input').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const target = e.target as HTMLInputElement;
+        const container = target.closest('[data-link-index]');
+        const index = parseInt(container?.getAttribute('data-link-index') || '0');
+        const field = target.getAttribute('data-field') as 'label' | 'url';
+        customLinks[index][field] = target.value;
+      });
+    });
+
+    // Boutons de suppression
+    customLinksContainer.querySelectorAll('[data-remove-link]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const index = parseInt(btn.getAttribute('data-remove-link') || '0');
+        customLinks.splice(index, 1);
+        renderCustomLinks();
+      });
+    });
+  }
+
+  function escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Ajouter un lien
+  addLinkBtn?.addEventListener('click', () => {
+    customLinks.push({ label: '', url: '' });
+    renderCustomLinks();
+  });
+
+  // Soumission du formulaire
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    if (!config) return;
+
+    // Récupérer les valeurs
+    config.author.name = (document.getElementById('name') as HTMLInputElement).value;
+    config.author.bio = (document.getElementById('bio') as HTMLTextAreaElement).value;
+    config.author.avatar = (document.getElementById('avatar') as HTMLInputElement).value;
+
+    config.social = {
+      twitter: (document.getElementById('twitter') as HTMLInputElement).value,
+      github: (document.getElementById('github') as HTMLInputElement).value,
+      mastodon: (document.getElementById('mastodon') as HTMLInputElement).value,
+      linkedin: (document.getElementById('linkedin') as HTMLInputElement).value,
+      bluesky: (document.getElementById('bluesky') as HTMLInputElement).value,
+    };
+
+    // Filtrer les liens vides
+    config.links = customLinks.filter(l => l.label && l.url);
+
+    if (submitBtn) {
+      submitBtn.setAttribute('disabled', 'true');
+      submitBtn.innerHTML = `
+        <svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Enregistrement...
+      `;
+    }
+
+    try {
+      const yamlContent = yaml.dump(config, { lineWidth: -1 });
+
+      await createOrUpdateFile(
+        'src/config.yml',
+        `# Configuration du MicroBlog\n${yamlContent}`,
+        'Mise à jour du profil',
+        originalSha
+      );
+
+      // Afficher un message de succès
+      alert('Profil mis à jour avec succès !');
+
+      // Recharger pour mettre à jour le SHA
+      loadConfig();
+    } catch (error) {
+      console.error('Failed to update config:', error);
+      alert('Erreur lors de la mise à jour');
+    } finally {
+      if (submitBtn) {
+        submitBtn.removeAttribute('disabled');
+        submitBtn.innerHTML = `
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+          </svg>
+          Enregistrer
+        `;
+      }
+    }
+  });
+
+  document.getElementById('retry-btn')?.addEventListener('click', loadConfig);
+
+  // Charger au démarrage
+  loadConfig();
+</script>

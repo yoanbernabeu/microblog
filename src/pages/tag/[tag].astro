@@ -1,0 +1,73 @@
+---
+import BaseLayout from '@layouts/BaseLayout.astro';
+import Header from '@components/Header.astro';
+import Footer from '@components/Footer.astro';
+import Post from '@components/Post.astro';
+import SearchModal from '@components/SearchModal.astro';
+import { getPublishedPosts, getAllHashtags, type PostWithHashtags } from '@lib/posts';
+import { getConfig } from '@lib/config';
+
+export async function getStaticPaths() {
+  const hashtagsMap = await getAllHashtags();
+
+  return Array.from(hashtagsMap.keys()).map((tag) => ({
+    params: { tag },
+  }));
+}
+
+const { tag } = Astro.params;
+const config = getConfig();
+const baseUrl = import.meta.env.BASE_URL;
+
+// Récupérer les posts avec ce tag
+const allPosts = await getPublishedPosts();
+const posts = allPosts.filter((post) =>
+  post.hashtags.some((h) => h.toLowerCase() === tag?.toLowerCase())
+);
+
+const title = `#${tag} - ${config.site.name}`;
+---
+
+<BaseLayout title={title} description={`Posts avec le hashtag #${tag}`}>
+  <Header />
+
+  <main id="main-content" class="flex-1">
+    <div class="max-w-2xl mx-auto px-4 py-8">
+      <!-- En-tête -->
+      <div class="mb-6">
+        <a
+          href={`${baseUrl}/tags`}
+          class="text-sm text-slate-500 hover:text-primary-600 dark:text-slate-400 dark:hover:text-primary-400 transition-colors flex items-center gap-1 mb-2"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+          Tous les tags
+        </a>
+        <h1 class="text-2xl font-bold text-slate-900 dark:text-white">
+          <span class="text-primary-600 dark:text-primary-400">#{tag}</span>
+        </h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          {posts.length} post{posts.length > 1 ? 's' : ''}
+        </p>
+      </div>
+
+      {posts.length === 0 ? (
+        <div class="card p-8 text-center">
+          <p class="text-slate-500 dark:text-slate-400">
+            Aucun post avec ce tag.
+          </p>
+        </div>
+      ) : (
+        <div class="space-y-6">
+          {posts.map((post) => (
+            <Post post={post} />
+          ))}
+        </div>
+      )}
+    </div>
+  </main>
+
+  <Footer />
+  <SearchModal />
+</BaseLayout>

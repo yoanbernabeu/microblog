@@ -1,0 +1,63 @@
+---
+import BaseLayout from '@layouts/BaseLayout.astro';
+import Header from '@components/Header.astro';
+import Footer from '@components/Footer.astro';
+import Post from '@components/Post.astro';
+import SearchModal from '@components/SearchModal.astro';
+import { getPublishedPosts, type PostWithHashtags } from '@lib/posts';
+import { getConfig } from '@lib/config';
+import { truncateText } from '@lib/utils';
+
+export async function getStaticPaths() {
+  const posts = await getPublishedPosts();
+
+  return posts.map((post) => ({
+    params: { timestamp: post.slug || post.id.replace('.md', '') },
+    props: { post },
+  }));
+}
+
+interface Props {
+  post: PostWithHashtags;
+}
+
+const { post } = Astro.props;
+const config = getConfig();
+const baseUrl = import.meta.env.BASE_URL;
+
+// Métadonnées SEO
+const content = post.body || '';
+const description = truncateText(content.replace(/#\w+/g, '').replace(/https?:\/\/[^\s]+/g, '').trim(), 160);
+const title = `${truncateText(content, 50)} - ${config.site.name}`;
+
+// Image pour OG (première image du post ou avatar)
+const ogImage = post.data.images?.[0]?.src
+  ? (post.data.images[0].src.startsWith('/') ? `${baseUrl}${post.data.images[0].src}` : post.data.images[0].src)
+  : config.author.avatar;
+---
+
+<BaseLayout title={title} description={description} image={ogImage} type="article">
+  <Header />
+
+  <main id="main-content" class="flex-1">
+    <div class="max-w-2xl mx-auto px-4 py-8">
+      <!-- Fil d'Ariane -->
+      <nav class="mb-6" aria-label="Fil d'Ariane">
+        <a
+          href={baseUrl}
+          class="text-sm text-slate-500 hover:text-primary-600 dark:text-slate-400 dark:hover:text-primary-400 transition-colors flex items-center gap-1"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+          Retour au feed
+        </a>
+      </nav>
+
+      <Post post={post} isDetail />
+    </div>
+  </main>
+
+  <Footer />
+  <SearchModal />
+</BaseLayout>

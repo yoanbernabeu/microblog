@@ -1,0 +1,173 @@
+---
+import { getConfig } from '@lib/config';
+import '../../styles/global.css';
+
+const config = getConfig();
+const baseUrl = import.meta.env.BASE_URL;
+const githubRepo = import.meta.env.PUBLIC_GITHUB_REPO || '';
+---
+
+<!doctype html>
+<html lang={config.site.language} class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Connexion - Admin - {config.site.name}</title>
+    <link rel="icon" type="image/svg+xml" href={`${baseUrl}/favicon.svg`} />
+
+    <script is:inline>
+      (function() {
+        const theme = localStorage.getItem('theme');
+        if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+  </head>
+  <body class="h-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+      <div class="card p-8">
+        <div class="text-center mb-8">
+          <h1 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+            Admin MicroBlog
+          </h1>
+          <p class="text-slate-500 dark:text-slate-400">
+            Connectez-vous pour gérer vos posts
+          </p>
+        </div>
+
+        <!-- Message d'erreur -->
+        <div id="error-message" class="hidden mb-4 p-3 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm">
+        </div>
+
+        <!-- Formulaire de token -->
+        <form id="token-form" class="space-y-4">
+          <div>
+            <label for="github-token" class="label">
+              Token GitHub (Personal Access Token)
+            </label>
+            <input
+              type="password"
+              id="github-token"
+              name="token"
+              class="input"
+              placeholder="ghp_xxxxxxxxxxxx"
+              required
+            />
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              <a
+                href="https://github.com/settings/tokens/new?description=MicroBlog&scopes=repo"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="link"
+              >
+                Créer un token GitHub
+              </a>
+              avec les permissions "repo"
+            </p>
+          </div>
+
+          <button type="submit" class="btn-primary w-full" id="submit-btn">
+            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+              <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
+            </svg>
+            Se connecter
+          </button>
+        </form>
+
+        <p class="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
+          Seul le propriétaire du repository peut accéder à l'admin.
+        </p>
+      </div>
+
+      <p class="mt-4 text-center">
+        <a
+          href={baseUrl || '/'}
+          class="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+        >
+          &larr; Retour au site
+        </a>
+      </p>
+    </div>
+
+    <script define:vars={{ baseUrl, githubRepo }}>
+      const GITHUB_REPO = githubRepo;
+
+      // Vérifier si déjà connecté
+      if (sessionStorage.getItem('github_token')) {
+        window.location.href = baseUrl + '/admin';
+      }
+
+      const form = document.getElementById('token-form');
+      const errorMessage = document.getElementById('error-message');
+      const submitBtn = document.getElementById('submit-btn');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(form);
+        const token = formData.get('token');
+
+        if (!token) return;
+
+        // Loading state
+        submitBtn.setAttribute('disabled', 'true');
+        submitBtn.innerHTML = `
+          <svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Vérification...
+        `;
+
+        try {
+          // Vérifier que le token est valide en récupérant l'utilisateur
+          const userResponse = await fetch('https://api.github.com/user', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/vnd.github.v3+json',
+            },
+          });
+
+          if (!userResponse.ok) {
+            throw new Error('Token invalide');
+          }
+
+          const user = await userResponse.json();
+
+          // Vérifier l'accès au repo
+          const repoResponse = await fetch(`https://api.github.com/repos/${GITHUB_REPO}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/vnd.github.v3+json',
+            },
+          });
+
+          if (!repoResponse.ok) {
+            throw new Error('Vous n\'avez pas accès à ce repository');
+          }
+
+          // Stocker le token et rediriger
+          sessionStorage.setItem('github_token', token);
+          sessionStorage.setItem('github_user', JSON.stringify(user));
+          window.location.href = baseUrl + '/admin';
+
+        } catch (error) {
+          // Afficher l'erreur
+          errorMessage.textContent = error.message || 'Erreur de connexion';
+          errorMessage.classList.remove('hidden');
+
+          // Reset button
+          submitBtn.removeAttribute('disabled');
+          submitBtn.innerHTML = `
+            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+              <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
+            </svg>
+            Se connecter
+          `;
+        }
+      });
+    </script>
+  </body>
+</html>

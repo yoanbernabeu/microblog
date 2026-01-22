@@ -1,0 +1,33 @@
+# Build output
+dist/
+.output/
+
+# Node dependencies
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Astro
+.astro/
+
+# TypeScript
+*.tsbuildinfo
+2026-01-22-tu-vas-maider-tablir-un-prd-pour-un-petit-proj.txt

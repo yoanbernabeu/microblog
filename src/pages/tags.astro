@@ -1,0 +1,56 @@
+---
+import BaseLayout from '@layouts/BaseLayout.astro';
+import Header from '@components/Header.astro';
+import Footer from '@components/Footer.astro';
+import SearchModal from '@components/SearchModal.astro';
+import { getAllHashtags } from '@lib/posts';
+import { getConfig } from '@lib/config';
+
+const config = getConfig();
+const hashtagsMap = await getAllHashtags();
+const baseUrl = import.meta.env.BASE_URL;
+
+// Convertir en tableau et trier par nombre de posts
+const hashtags = Array.from(hashtagsMap.entries())
+  .map(([tag, count]) => ({ tag, count }))
+  .sort((a, b) => b.count - a.count);
+
+const title = `Tous les tags - ${config.site.name}`;
+---
+
+<BaseLayout title={title} description="Parcourez tous les hashtags utilisés sur ce microblog">
+  <Header />
+
+  <main id="main-content" class="flex-1">
+    <div class="max-w-2xl mx-auto px-4 py-8">
+      <h1 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">
+        Tous les tags
+      </h1>
+
+      {hashtags.length === 0 ? (
+        <div class="card p-8 text-center">
+          <p class="text-slate-500 dark:text-slate-400">
+            Aucun tag pour le moment.
+          </p>
+        </div>
+      ) : (
+        <div class="card p-6">
+          <div class="flex flex-wrap gap-2">
+            {hashtags.map(({ tag, count }) => (
+              <a
+                href={`${baseUrl}/tag/${tag}`}
+                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-primary-100 hover:text-primary-700 dark:hover:bg-primary-900 dark:hover:text-primary-300 transition-colors"
+              >
+                <span class="hashtag">#{tag}</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400">({count})</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  </main>
+
+  <Footer />
+  <SearchModal />
+</BaseLayout>

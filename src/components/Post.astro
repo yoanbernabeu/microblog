@@ -1,0 +1,101 @@
+---
+import type { PostWithHashtags } from '@lib/posts';
+import { parsePostContent, formatPostDate, formatDatetime, extractFirstLink, isYouTubeUrl, extractYouTubeId } from '@lib/posts';
+import PostImages from './PostImages.astro';
+import PostDate from './PostDate.astro';
+import YouTubeEmbed from './YouTubeEmbed.astro';
+import LinkPreview from './LinkPreview.astro';
+
+interface Props {
+  post: PostWithHashtags;
+  isDetail?: boolean;
+}
+
+const { post, isDetail = false } = Astro.props;
+const baseUrl = import.meta.env.BASE_URL;
+
+const content = post.body || '';
+const htmlContent = parsePostContent(content, baseUrl);
+const postUrl = `${baseUrl}/post/${post.slug || post.id.replace('.md', '')}`;
+
+// Détection du premier lien
+const firstLink = extractFirstLink(content);
+const isYouTube = firstLink ? isYouTubeUrl(firstLink) : false;
+const youtubeId = isYouTube && firstLink ? extractYouTubeId(firstLink) : null;
+---
+
+<article class="card p-4 sm:p-6">
+  <!-- Contenu du post -->
+  <div
+    class="prose prose-slate dark:prose-invert max-w-none text-slate-800 dark:text-slate-200"
+    set:html={htmlContent}
+  />
+
+  <!-- Images -->
+  {post.data.images && post.data.images.length > 0 && (
+    <PostImages images={post.data.images} />
+  )}
+
+  <!-- YouTube Embed -->
+  {youtubeId && (
+    <YouTubeEmbed videoId={youtubeId} />
+  )}
+
+  <!-- Link Preview (si pas YouTube) -->
+  {firstLink && !isYouTube && (
+    <LinkPreview url={firstLink} />
+  )}
+
+  <!-- Footer du post -->
+  <footer class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+    <PostDate date={post.data.publishedAt} />
+
+    {!isDetail && (
+      <a
+        href={postUrl}
+        class="text-sm text-slate-500 hover:text-primary-600 dark:text-slate-400 dark:hover:text-primary-400 transition-colors"
+      >
+        Voir le post &rarr;
+      </a>
+    )}
+
+    {isDetail && (
+      <button
+        type="button"
+        class="text-sm text-slate-500 hover:text-primary-600 dark:text-slate-400 dark:hover:text-primary-400 transition-colors flex items-center gap-1"
+        data-share-url={new URL(postUrl, Astro.site).href}
+        aria-label="Partager ce post"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+        </svg>
+        Partager
+      </button>
+    )}
+  </footer>
+</article>
+
+<script>
+  function initShareButtons() {
+    document.querySelectorAll('[data-share-url]').forEach(button => {
+      button.addEventListener('click', async () => {
+        const url = button.getAttribute('data-share-url');
+        if (!url) return;
+
+        if (navigator.share) {
+          try {
+            await navigator.share({ url });
+          } catch {
+            // User cancelled or error
+          }
+        } else {
+          await navigator.clipboard.writeText(url);
+          // Could show a toast here
+        }
+      });
+    });
+  }
+
+  initShareButtons();
+  document.addEventListener('astro:after-swap', initShareButtons);
+</script>

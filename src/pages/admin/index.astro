@@ -1,0 +1,430 @@
+---
+import AdminLayout from '@layouts/AdminLayout.astro';
+
+const baseUrl = import.meta.env.BASE_URL;
+const githubRepo = import.meta.env.PUBLIC_GITHUB_REPO || '';
+---
+
+<AdminLayout title="Dashboard">
+  <div class="space-y-6">
+    <!-- En-tête -->
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold text-slate-900 dark:text-white">
+        Mes posts
+      </h1>
+      <a href={`${baseUrl}/admin/post/new`} class="btn-primary">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        Nouveau post
+      </a>
+    </div>
+
+    <!-- Onglets -->
+    <div class="border-b border-slate-200 dark:border-slate-700">
+      <nav class="flex gap-4" aria-label="Filtrer par statut">
+        <button
+          type="button"
+          class="tab-btn active px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+          data-tab="published"
+        >
+          Publiés
+          <span class="ml-1 text-xs bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full" id="count-published">0</span>
+        </button>
+        <button
+          type="button"
+          class="tab-btn px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+          data-tab="draft"
+        >
+          Brouillons
+          <span class="ml-1 text-xs bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full" id="count-draft">0</span>
+        </button>
+        <button
+          type="button"
+          class="tab-btn px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+          data-tab="scheduled"
+        >
+          Programmés
+          <span class="ml-1 text-xs bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full" id="count-scheduled">0</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Chargement -->
+    <div id="loading-state" class="card p-8 text-center">
+      <div class="inline-block w-8 h-8 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+      <p class="mt-2 text-slate-500 dark:text-slate-400">Chargement des posts...</p>
+    </div>
+
+    <!-- Erreur -->
+    <div id="error-state" class="hidden card p-8 text-center">
+      <div class="text-4xl mb-2">⚠️</div>
+      <p class="text-slate-700 dark:text-slate-300" id="error-message">Une erreur est survenue</p>
+      <button type="button" id="retry-btn" class="btn-secondary mt-4">
+        Réessayer
+      </button>
+    </div>
+
+    <!-- Liste des posts -->
+    <div id="posts-list" class="hidden space-y-4">
+    </div>
+
+    <!-- État vide -->
+    <div id="empty-state" class="hidden card p-8 text-center">
+      <div class="text-4xl mb-2">📝</div>
+      <p class="text-slate-700 dark:text-slate-300">Aucun post dans cette catégorie</p>
+      <a href={`${baseUrl}/admin/post/new`} class="btn-primary mt-4 inline-flex">
+        Créer mon premier post
+      </a>
+    </div>
+  </div>
+
+  <!-- Modal de confirmation de suppression -->
+  <div id="delete-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div class="card p-6 max-w-md mx-4">
+      <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+        Supprimer ce post ?
+      </h2>
+      <p class="text-slate-500 dark:text-slate-400 mb-4">
+        Cette action est irréversible. Le post et ses images seront définitivement supprimés.
+      </p>
+      <div class="flex gap-3 justify-end">
+        <button type="button" id="cancel-delete" class="btn-secondary">
+          Annuler
+        </button>
+        <button type="button" id="confirm-delete" class="btn-danger">
+          Supprimer
+        </button>
+      </div>
+    </div>
+  </div>
+</AdminLayout>
+
+<script define:vars={{ baseUrl, githubRepo }}>
+  // Configuration
+  const GITHUB_REPO = githubRepo;
+  const API_BASE = 'https://api.github.com';
+
+  // Récupérer le token
+  function getToken() {
+    return sessionStorage.getItem('github_token');
+  }
+
+  // Headers pour les requêtes GitHub
+  function getHeaders() {
+    const token = getToken();
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    };
+  }
+
+  // Récupérer le contenu d'un fichier
+  async function getFileContent(path) {
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/contents/${path}`, {
+      headers: getHeaders()
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erreur ${response.status}: ${response.statusText}`);
+    }
+
+    const file = await response.json();
+    const content = atob(file.content);
+    return { content, sha: file.sha };
+  }
+
+  // Lister les fichiers d'un dossier
+  async function listFiles(path) {
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/contents/${path}`, {
+      headers: getHeaders()
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) return [];
+      throw new Error(`Erreur ${response.status}: ${response.statusText}`);
+    }
+
+    const contents = await response.json();
+    return Array.isArray(contents) ? contents : [contents];
+  }
+
+  // Supprimer un fichier
+  async function deleteFile(path, message, sha) {
+    const response = await fetch(`${API_BASE}/repos/${GITHUB_REPO}/contents/${path}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        message,
+        sha,
+        branch: 'main',
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erreur ${response.status}: ${response.statusText}`);
+    }
+  }
+
+  // Variables globales
+  let allPosts = [];
+  let currentTab = 'published';
+  let postToDelete = null;
+
+  // Éléments DOM
+  const loadingState = document.getElementById('loading-state');
+  const errorState = document.getElementById('error-state');
+  const postsList = document.getElementById('posts-list');
+  const emptyState = document.getElementById('empty-state');
+  const deleteModal = document.getElementById('delete-modal');
+
+  // Parser le frontmatter d'un fichier markdown
+  function parseFrontmatter(content) {
+    const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+    if (!match) return { data: {}, body: content };
+
+    const frontmatter = match[1];
+    const body = match[2];
+    const data = {};
+
+    frontmatter.split('\n').forEach(line => {
+      const colonIndex = line.indexOf(':');
+      if (colonIndex > 0) {
+        const key = line.slice(0, colonIndex).trim();
+        const value = line.slice(colonIndex + 1).trim();
+        if (value === '[]' || value.startsWith('[')) {
+          try {
+            data[key] = JSON.parse(value.replace(/'/g, '"'));
+          } catch {
+            data[key] = [];
+          }
+        } else {
+          data[key] = value;
+        }
+      }
+    });
+
+    return { data, body };
+  }
+
+  // Charger les posts
+  async function loadPosts() {
+    loadingState?.classList.remove('hidden');
+    errorState?.classList.add('hidden');
+    postsList?.classList.add('hidden');
+    emptyState?.classList.add('hidden');
+
+    try {
+      const files = await listFiles('src/content/posts');
+      const mdFiles = files.filter(f => f.name.endsWith('.md'));
+      allPosts = [];
+
+      for (const file of mdFiles) {
+        try {
+          const { content, sha } = await getFileContent(file.path);
+          const { data, body } = parseFrontmatter(content);
+
+          allPosts.push({
+            id: file.name.replace('.md', ''),
+            sha,
+            status: data.status || 'draft',
+            publishedAt: new Date(data.publishedAt),
+            content: body.trim(),
+            images: data.images || [],
+          });
+        } catch (err) {
+          console.error(`Failed to load post ${file.name}:`, err);
+        }
+      }
+
+      // Trier par date décroissante
+      allPosts.sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
+
+      updateCounts();
+      renderPosts();
+    } catch (error) {
+      console.error('Failed to load posts:', error);
+      loadingState?.classList.add('hidden');
+      errorState?.classList.remove('hidden');
+      const errorMessage = document.getElementById('error-message');
+      if (errorMessage) {
+        errorMessage.textContent = error.message || 'Erreur lors du chargement';
+      }
+    }
+  }
+
+  // Mettre à jour les compteurs
+  function updateCounts() {
+    const counts = {
+      published: allPosts.filter(p => p.status === 'published').length,
+      draft: allPosts.filter(p => p.status === 'draft').length,
+      scheduled: allPosts.filter(p => p.status === 'scheduled').length,
+    };
+
+    document.getElementById('count-published').textContent = counts.published.toString();
+    document.getElementById('count-draft').textContent = counts.draft.toString();
+    document.getElementById('count-scheduled').textContent = counts.scheduled.toString();
+  }
+
+  // Échapper le HTML
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Afficher les posts
+  function renderPosts() {
+    loadingState?.classList.add('hidden');
+
+    const filteredPosts = allPosts.filter(p => p.status === currentTab);
+
+    if (filteredPosts.length === 0) {
+      postsList?.classList.add('hidden');
+      emptyState?.classList.remove('hidden');
+      return;
+    }
+
+    emptyState?.classList.add('hidden');
+    postsList?.classList.remove('hidden');
+
+    postsList.innerHTML = filteredPosts.map(post => `
+      <div class="card p-4 hover:shadow-md transition-shadow">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex-1 min-w-0">
+            <p class="text-slate-800 dark:text-slate-200 line-clamp-2">${escapeHtml(post.content)}</p>
+            <div class="mt-2 flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+              <time datetime="${post.publishedAt.toISOString()}">
+                ${post.publishedAt.toLocaleDateString('fr-FR', { dateStyle: 'medium' })}
+              </time>
+              ${post.images && post.images.length > 0 ? `
+                <span class="flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  ${post.images.length}
+                </span>
+              ` : ''}
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <a
+              href="${baseUrl}/admin/edit?id=${post.id}"
+              class="p-2 text-slate-500 hover:text-primary-600 dark:text-slate-400 dark:hover:text-primary-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              title="Modifier"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </a>
+            <button
+              type="button"
+              class="delete-btn p-2 text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              data-post-id="${post.id}"
+              title="Supprimer"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    // Attacher les événements de suppression
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const postId = btn.getAttribute('data-post-id');
+        postToDelete = allPosts.find(p => p.id === postId) || null;
+        deleteModal?.classList.remove('hidden');
+        deleteModal?.classList.add('flex');
+      });
+    });
+  }
+
+  // Supprimer un post
+  async function handleDelete() {
+    if (!postToDelete) return;
+
+    const confirmBtn = document.getElementById('confirm-delete');
+    if (confirmBtn) {
+      confirmBtn.setAttribute('disabled', 'true');
+      confirmBtn.textContent = 'Suppression...';
+    }
+
+    try {
+      await deleteFile(
+        `src/content/posts/${postToDelete.id}.md`,
+        `Suppression du post ${postToDelete.id}`,
+        postToDelete.sha
+      );
+
+      // Supprimer des posts locaux
+      allPosts = allPosts.filter(p => p.id !== postToDelete.id);
+
+      closeDeleteModal();
+      updateCounts();
+      renderPosts();
+    } catch (error) {
+      console.error('Failed to delete post:', error);
+      alert('Erreur lors de la suppression: ' + error.message);
+    } finally {
+      if (confirmBtn) {
+        confirmBtn.removeAttribute('disabled');
+        confirmBtn.textContent = 'Supprimer';
+      }
+    }
+  }
+
+  function closeDeleteModal() {
+    deleteModal?.classList.add('hidden');
+    deleteModal?.classList.remove('flex');
+    postToDelete = null;
+  }
+
+  // Event listeners
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.remove('active', 'border-primary-600', 'text-primary-600', 'dark:border-primary-400', 'dark:text-primary-400');
+        b.classList.add('border-transparent');
+      });
+      btn.classList.add('active', 'border-primary-600', 'text-primary-600', 'dark:border-primary-400', 'dark:text-primary-400');
+      btn.classList.remove('border-transparent');
+      currentTab = btn.getAttribute('data-tab') || 'published';
+      renderPosts();
+    });
+  });
+
+  // Appliquer les styles au tab actif au chargement
+  const activeTab = document.querySelector('.tab-btn.active');
+  if (activeTab) {
+    activeTab.classList.add('border-primary-600', 'text-primary-600', 'dark:border-primary-400', 'dark:text-primary-400');
+  }
+
+  document.getElementById('retry-btn')?.addEventListener('click', loadPosts);
+  document.getElementById('cancel-delete')?.addEventListener('click', closeDeleteModal);
+  document.getElementById('confirm-delete')?.addEventListener('click', handleDelete);
+
+  // Charger les posts au démarrage
+  loadPosts();
+</script>
+
+<style>
+  .tab-btn {
+    @apply text-slate-500 border-transparent hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200;
+  }
+
+  .tab-btn.active {
+    @apply text-primary-600 border-primary-600 dark:text-primary-400 dark:border-primary-400;
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+</style>

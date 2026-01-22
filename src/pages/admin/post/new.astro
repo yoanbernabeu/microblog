@@ -1,0 +1,367 @@
+---
+import AdminLayout from '@layouts/AdminLayout.astro';
+
+const baseUrl = import.meta.env.BASE_URL;
+---
+
+<AdminLayout title="Nouveau post">
+  <div class="max-w-2xl mx-auto">
+    <!-- En-tête -->
+    <div class="mb-6">
+      <a
+        href={`${baseUrl}/admin`}
+        class="text-sm text-slate-500 hover:text-primary-600 dark:text-slate-400 dark:hover:text-primary-400 transition-colors flex items-center gap-1 mb-2"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+        Retour au dashboard
+      </a>
+      <h1 class="text-2xl font-bold text-slate-900 dark:text-white">
+        Nouveau post
+      </h1>
+    </div>
+
+    <!-- Éditeur -->
+    <form id="post-form" class="space-y-6">
+      <!-- Contenu du post -->
+      <div class="card p-4">
+        <label for="content" class="sr-only">Contenu du post</label>
+        <textarea
+          id="content"
+          name="content"
+          class="w-full h-32 resize-none border-0 bg-transparent text-slate-900 dark:text-white placeholder-slate-400 focus:ring-0 text-lg"
+          placeholder="Quoi de neuf ?"
+          maxlength="280"
+          required
+        ></textarea>
+        <div class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-700">
+          <span id="char-count" class="text-sm text-slate-500 dark:text-slate-400">
+            280 caractères restants
+          </span>
+        </div>
+      </div>
+
+      <!-- Upload d'images -->
+      <div class="card p-4">
+        <label class="label mb-2">Images (max 4)</label>
+
+        <!-- Zone de drop -->
+        <div
+          id="drop-zone"
+          class="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-6 text-center hover:border-primary-500 dark:hover:border-primary-400 transition-colors cursor-pointer"
+        >
+          <svg class="w-8 h-8 mx-auto text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <p class="text-slate-500 dark:text-slate-400 text-sm">
+            Glissez des images ici ou <span class="text-primary-600 dark:text-primary-400">cliquez pour sélectionner</span>
+          </p>
+          <p class="text-xs text-slate-400 mt-1">JPG, PNG, WebP, GIF - Max 10 Mo par image</p>
+          <input
+            type="file"
+            id="file-input"
+            class="hidden"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            multiple
+          />
+        </div>
+
+        <!-- Prévisualisation des images -->
+        <div id="image-preview" class="mt-4 grid grid-cols-2 gap-2 hidden">
+        </div>
+      </div>
+
+      <!-- Options de publication -->
+      <div class="card p-4">
+        <label class="label mb-3">Statut</label>
+        <div class="flex flex-wrap gap-3">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="status" value="published" checked class="text-primary-600 focus:ring-primary-500" />
+            <span class="text-slate-700 dark:text-slate-300">Publier maintenant</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="status" value="draft" class="text-primary-600 focus:ring-primary-500" />
+            <span class="text-slate-700 dark:text-slate-300">Brouillon</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="status" value="scheduled" class="text-primary-600 focus:ring-primary-500" />
+            <span class="text-slate-700 dark:text-slate-300">Programmer</span>
+          </label>
+        </div>
+
+        <!-- Sélecteur de date (pour posts programmés) -->
+        <div id="schedule-picker" class="mt-4 hidden">
+          <label for="scheduled-date" class="label">Date et heure de publication</label>
+          <input
+            type="datetime-local"
+            id="scheduled-date"
+            name="scheduledDate"
+            class="input"
+          />
+        </div>
+      </div>
+
+      <!-- Boutons d'action -->
+      <div class="flex gap-3">
+        <button type="submit" id="submit-btn" class="btn-primary flex-1">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+          </svg>
+          Publier
+        </button>
+        <a href={`${baseUrl}/admin`} class="btn-secondary">
+          Annuler
+        </a>
+      </div>
+    </form>
+  </div>
+</AdminLayout>
+
+<script>
+  import { createOrUpdateFile, uploadImage } from '@lib/github';
+  import { generateTimestamp } from '@lib/utils';
+
+  const baseUrl = import.meta.env.BASE_URL;
+  const MAX_IMAGES = 4;
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 Mo
+
+  interface ImageData {
+    file: File;
+    preview: string;
+    alt: string;
+  }
+
+  let images: ImageData[] = [];
+
+  // Éléments DOM
+  const form = document.getElementById('post-form') as HTMLFormElement;
+  const contentInput = document.getElementById('content') as HTMLTextAreaElement;
+  const charCount = document.getElementById('char-count');
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input') as HTMLInputElement;
+  const imagePreview = document.getElementById('image-preview');
+  const schedulePicker = document.getElementById('schedule-picker');
+  const submitBtn = document.getElementById('submit-btn');
+
+  // Compteur de caractères
+  contentInput?.addEventListener('input', () => {
+    const remaining = 280 - contentInput.value.length;
+    if (charCount) {
+      charCount.textContent = `${remaining} caractères restants`;
+      charCount.className = `text-sm ${remaining < 20 ? 'text-red-500' : 'text-slate-500 dark:text-slate-400'}`;
+    }
+  });
+
+  // Afficher/masquer le sélecteur de date
+  document.querySelectorAll('input[name="status"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (schedulePicker) {
+        schedulePicker.classList.toggle('hidden', target.value !== 'scheduled');
+      }
+      if (submitBtn) {
+        submitBtn.innerHTML = target.value === 'draft'
+          ? `<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>Enregistrer le brouillon`
+          : target.value === 'scheduled'
+          ? `<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Programmer`
+          : `<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>Publier`;
+      }
+    });
+  });
+
+  // Drag & Drop
+  dropZone?.addEventListener('click', () => fileInput?.click());
+
+  dropZone?.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/20');
+  });
+
+  dropZone?.addEventListener('dragleave', () => {
+    dropZone.classList.remove('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/20');
+  });
+
+  dropZone?.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/20');
+    const files = Array.from(e.dataTransfer?.files || []);
+    handleFiles(files);
+  });
+
+  fileInput?.addEventListener('change', () => {
+    const files = Array.from(fileInput.files || []);
+    handleFiles(files);
+    fileInput.value = '';
+  });
+
+  // Coller des images (Ctrl+V / Cmd+V)
+  document.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const imageFiles: File[] = [];
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      handleFiles(imageFiles);
+    }
+  });
+
+  function handleFiles(files: File[]) {
+    const validFiles = files.filter(file => {
+      if (!file.type.startsWith('image/')) {
+        alert(`${file.name} n'est pas une image valide`);
+        return false;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        alert(`${file.name} dépasse la taille maximale de 10 Mo`);
+        return false;
+      }
+      return true;
+    });
+
+    const remainingSlots = MAX_IMAGES - images.length;
+    if (validFiles.length > remainingSlots) {
+      alert(`Vous ne pouvez ajouter que ${remainingSlots} image(s) supplémentaire(s)`);
+    }
+
+    validFiles.slice(0, remainingSlots).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        images.push({
+          file,
+          preview: e.target?.result as string,
+          alt: '',
+        });
+        renderImagePreviews();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function renderImagePreviews() {
+    if (!imagePreview) return;
+
+    if (images.length === 0) {
+      imagePreview.classList.add('hidden');
+      imagePreview.innerHTML = '';
+      return;
+    }
+
+    imagePreview.classList.remove('hidden');
+    imagePreview.innerHTML = images.map((img, index) => `
+      <div class="relative group aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
+        <img src="${img.preview}" alt="" class="w-full h-full object-cover" />
+        <button
+          type="button"
+          class="remove-image absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          data-index="${index}"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    `).join('');
+
+    // Boutons de suppression
+    document.querySelectorAll('.remove-image').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const index = parseInt(btn.getAttribute('data-index') || '0');
+        images.splice(index, 1);
+        renderImagePreviews();
+      });
+    });
+  }
+
+  // Soumission du formulaire
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const content = contentInput.value.trim();
+    if (!content) {
+      alert('Le contenu est requis');
+      return;
+    }
+
+    const status = (document.querySelector('input[name="status"]:checked') as HTMLInputElement)?.value || 'published';
+    const scheduledDateInput = document.getElementById('scheduled-date') as HTMLInputElement;
+
+    let publishedAt: Date;
+    if (status === 'scheduled' && scheduledDateInput?.value) {
+      publishedAt = new Date(scheduledDateInput.value);
+    } else {
+      publishedAt = new Date();
+    }
+
+    // Désactiver le bouton
+    if (submitBtn) {
+      submitBtn.setAttribute('disabled', 'true');
+      submitBtn.innerHTML = `
+        <svg class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Publication en cours...
+      `;
+    }
+
+    try {
+      const timestamp = generateTimestamp();
+
+      // Upload des images
+      const uploadedImages: Array<{ src: string; alt: string }> = [];
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        const ext = img.file.name.split('.').pop() || 'jpg';
+        const imagePath = `public/images/posts/${timestamp}-${i}.${ext}`;
+
+        await uploadImage(imagePath, img.preview, `Ajout image ${i + 1} pour post ${timestamp}`);
+        uploadedImages.push({
+          src: `/images/posts/${timestamp}-${i}.${ext}`,
+          alt: img.alt,
+        });
+      }
+
+      // Créer le fichier markdown
+      const frontmatter = [
+        '---',
+        `status: ${status}`,
+        `publishedAt: ${publishedAt.toISOString()}`,
+        `images: ${JSON.stringify(uploadedImages)}`,
+        '---',
+        '',
+        content,
+      ].join('\n');
+
+      await createOrUpdateFile(
+        `src/content/posts/${timestamp}.md`,
+        frontmatter,
+        `Nouveau post: ${content.slice(0, 50)}...`
+      );
+
+      // Rediriger vers le dashboard
+      window.location.href = `${baseUrl}/admin`;
+    } catch (error) {
+      console.error('Failed to create post:', error);
+      alert('Erreur lors de la création du post');
+
+      if (submitBtn) {
+        submitBtn.removeAttribute('disabled');
+        submitBtn.innerHTML = `
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+          </svg>
+          Publier
+        `;
+      }
+    }
+  });
+</script>
