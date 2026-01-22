@@ -1,22 +1,27 @@
 # Configuration du MicroBlog
+
 site:
-  name: Mon MicroBlog
-  description: Mes pensées, liens et découvertes
-  language: fr
+  name: "Mon MicroBlog"
+  description: "Mes pensées, liens et découvertes"
+  language: "fr"
+
 author:
-  name: Yoan Bernabeu
-  bio: Développeur passionné | Tech enthusiast | Partage de découvertes
-  avatar: /images/avatar.jpg
+  name: "Yoan Bernabeu"
+  bio: "Lead Dev | Je transforme les idées en solutions | Youtubeur passionné"
+  avatar: "/images/avatar-1769118230441.webp"
+
 social:
-  twitter: ''
-  github: ''
-  mastodon: ''
-  linkedin: ''
-  bluesky: ''
+  twitter: "https://x.com/yOyO38"
+  github: "https://github.com/yoanbernabeu"
+  mastodon: 
+  linkedin: "https://linkedin.com/in/yoan-bernabeu"
+  bluesky: "https://bsky.app/profile/yoandev.co"
+
 links:
-  - label: Mon Blog
-    url: https://example.com
-  - label: Portfolio
-    url: https://portfolio.example.com
+  - label: "Mon Blog"
+    url: "https://yoandev.co"
+  - label: "YouTube"
+    url: "https://www.youtube.com/@yoandevco"
+
 feed:
   postsPerPage: 20
