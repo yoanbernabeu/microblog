@@ -151,7 +151,8 @@ const githubRepo = import.meta.env.PUBLIC_GITHUB_REPO || '';
     });
     if (!response.ok) throw new Error('Fichier non trouvé');
     const file = await response.json();
-    return { content: atob(file.content), sha: file.sha };
+    // Décoder le base64 avec support UTF-8
+    return { content: decodeURIComponent(escape(atob(file.content))), sha: file.sha };
   }
 
   // Créer un blob

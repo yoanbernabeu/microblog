@@ -131,7 +131,8 @@ const githubRepo = import.meta.env.PUBLIC_GITHUB_REPO || '';
     }
 
     const file = await response.json();
-    const content = atob(file.content);
+    // Décoder le base64 avec support UTF-8
+    const content = decodeURIComponent(escape(atob(file.content)));
     return { content, sha: file.sha };
   }
 

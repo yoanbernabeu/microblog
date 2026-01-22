@@ -95,7 +95,8 @@ export async function getFileContent(path: string): Promise<{ content: string; s
     throw { message: 'Impossible de lire le contenu du fichier', status: 400 } as GitHubError;
   }
 
-  const content = atob(file.content);
+  // Décoder le base64 avec support UTF-8
+  const content = decodeURIComponent(escape(atob(file.content)));
   return { content, sha: file.sha };
 }
 
