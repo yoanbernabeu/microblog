@@ -9,8 +9,8 @@ export default defineConfig({
   ],
   output: 'static',
   prefetch: {
-    prefetchAll: true,
-    defaultStrategy: 'viewport'
+    prefetchAll: false,
+    defaultStrategy: 'hover'
   },
   build: {
     assets: 'assets'
