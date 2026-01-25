@@ -3,6 +3,7 @@ import tailwind from '@astrojs/tailwind';
 
 export default defineConfig({
   site: 'https://microblog.yoandev.co',
+  base: '/',
   integrations: [
     tailwind()
   ],
