@@ -58,7 +58,7 @@ const baseUrl = rawBaseUrl === '/' ? '' : rawBaseUrl.replace(/\/$/, '');
     <link rel="icon" type="image/svg+xml" href={`${baseUrl}/favicon.svg`} />
 
     <!-- View Transitions pour navigation fluide -->
-    <ViewTransitions />
+    <ViewTransitions fallback="none" />
 
     <!-- Theme script (prevent FOUC) -->
     <script is:inline>
@@ -72,6 +72,11 @@ const baseUrl = rawBaseUrl === '/' ? '' : rawBaseUrl.replace(/\/$/, '');
       }
       applyTheme();
       document.addEventListener('astro:after-swap', applyTheme);
+
+      // Fix scroll iOS avec View Transitions
+      document.addEventListener('astro:after-swap', () => {
+        window.scrollTo(0, 0);
+      });
     </script>
   </head>
   <body class="h-full bg-surface-50 dark:bg-surface-950 transition-colors relative">
