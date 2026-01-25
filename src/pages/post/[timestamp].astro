@@ -56,7 +56,7 @@ const ogImage = post.data.images?.[0]?.src
         </a>
       </nav>
 
-      <Post post={post} isDetail />
+      <Post post={post} isDetail eager />
 
       <Comments term={post.slug || post.id.replace('.md', '')} />
     </div>

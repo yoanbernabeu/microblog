@@ -40,9 +40,9 @@ const firstPagePosts = posts.slice(0, POSTS_PER_PAGE);
         </div>
       ) : (
         <div class="space-y-6" id="posts-container">
-          {firstPagePosts.map((post) => (
+          {firstPagePosts.map((post, index) => (
             <div class="post-item animate-fade-in">
-              <Post post={post} />
+              <Post post={post} eager={index < 2} />
             </div>
           ))}
         </div>
