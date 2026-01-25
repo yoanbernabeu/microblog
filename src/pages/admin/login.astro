@@ -3,7 +3,8 @@ import { getConfig } from '@lib/config';
 import '../../styles/global.css';
 
 const config = getConfig();
-const baseUrl = import.meta.env.BASE_URL;
+const rawBaseUrl = import.meta.env.BASE_URL;
+const baseUrl = rawBaseUrl === '/' ? '' : rawBaseUrl.replace(/\/$/, '');
 const githubRepo = import.meta.env.PUBLIC_GITHUB_REPO || '';
 const githubClientId = import.meta.env.PUBLIC_GITHUB_CLIENT_ID || '';
 const githubProxyUrl = import.meta.env.PUBLIC_GITHUB_PROXY_URL || '';

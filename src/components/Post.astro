@@ -12,7 +12,8 @@ interface Props {
 }
 
 const { post, isDetail = false } = Astro.props;
-const baseUrl = import.meta.env.BASE_URL;
+const rawBaseUrl = import.meta.env.BASE_URL;
+const baseUrl = rawBaseUrl === '/' ? '' : rawBaseUrl.replace(/\/$/, '');
 
 const content = post.body || '';
 const htmlContent = parsePostContent(content, baseUrl);

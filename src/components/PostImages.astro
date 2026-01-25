@@ -9,7 +9,8 @@ interface Props {
 }
 
 const { images } = Astro.props;
-const baseUrl = import.meta.env.BASE_URL;
+const rawBaseUrl = import.meta.env.BASE_URL;
+const baseUrl = rawBaseUrl === '/' ? '' : rawBaseUrl.replace(/\/$/, '');
 
 // Import de toutes les images du dossier assets
 const allImages = import.meta.glob<{ default: ImageMetadata }>(

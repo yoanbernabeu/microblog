@@ -7,7 +7,8 @@ import { truncateText } from '@lib/utils';
 export async function GET(context: APIContext) {
   const config = getConfig();
   const posts = await getPublishedPosts();
-  const baseUrl = import.meta.env.BASE_URL;
+  const rawBaseUrl = import.meta.env.BASE_URL;
+  const baseUrl = rawBaseUrl === '/' ? '' : rawBaseUrl.replace(/\/$/, '');
 
   return rss({
     title: config.site.name,
