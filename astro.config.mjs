@@ -8,10 +8,6 @@ export default defineConfig({
     tailwind()
   ],
   output: 'static',
-  prefetch: {
-    prefetchAll: false,
-    defaultStrategy: 'hover'
-  },
   build: {
     assets: 'assets'
   },
