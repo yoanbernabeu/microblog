@@ -13,15 +13,14 @@ author:
 social:
   twitter: "https://x.com/yOyO38"
   github: "https://github.com/yoanbernabeu"
-  mastodon: 
+  mastodon:
   linkedin: "https://linkedin.com/in/yoan-bernabeu"
   bluesky: "https://bsky.app/profile/yoandev.co"
+  youtube: "https://www.youtube.com/@yoandevco"
 
 links:
   - label: "Mon Blog"
     url: "https://yoandev.co"
-  - label: "YouTube"
-    url: "https://www.youtube.com/@yoandevco"
 
 feed:
   postsPerPage: 20

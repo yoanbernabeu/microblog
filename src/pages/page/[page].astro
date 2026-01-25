@@ -1,0 +1,72 @@
+---
+import BaseLayout from '@layouts/BaseLayout.astro';
+import Header from '@components/Header.astro';
+import Footer from '@components/Footer.astro';
+import Post from '@components/Post.astro';
+import SearchModal from '@components/SearchModal.astro';
+import { getPublishedPosts } from '@lib/posts';
+import { getConfig } from '@lib/config';
+
+export async function getStaticPaths() {
+  const POSTS_PER_PAGE = 5;
+  const posts = await getPublishedPosts();
+  const totalPages = Math.ceil(posts.length / POSTS_PER_PAGE);
+
+  // Générer les pages 2, 3, 4... (la page 1 est index.astro)
+  return Array.from({ length: totalPages - 1 }, (_, i) => ({
+    params: { page: String(i + 2) },
+  }));
+}
+
+const POSTS_PER_PAGE = 5;
+
+const { page } = Astro.params;
+const pageNum = parseInt(page);
+const config = getConfig();
+const allPosts = await getPublishedPosts();
+const totalPages = Math.ceil(allPosts.length / POSTS_PER_PAGE);
+
+// Posts pour cette page
+const startIndex = (pageNum - 1) * POSTS_PER_PAGE;
+const posts = allPosts.slice(startIndex, startIndex + POSTS_PER_PAGE);
+---
+
+<BaseLayout>
+  <Header />
+
+  <main id="main-content" class="flex-1">
+    <div class="max-w-2xl mx-auto px-4 py-12">
+      <h2 class="sr-only">Posts - Page {pageNum}</h2>
+
+      <div class="space-y-6" id="posts-container">
+        {posts.map((post) => (
+          <div class="post-item">
+            <Post post={post} />
+          </div>
+        ))}
+      </div>
+
+      <!-- Navigation pour les utilisateurs sans JS -->
+      <noscript>
+        <nav class="flex justify-center gap-4 py-8">
+          {pageNum > 1 && (
+            <a
+              href={pageNum === 2 ? '/' : `/page/${pageNum - 1}/`}
+              class="btn-secondary"
+            >
+              &larr; Page précédente
+            </a>
+          )}
+          {pageNum < totalPages && (
+            <a href={`/page/${pageNum + 1}/`} class="btn-primary">
+              Page suivante &rarr;
+            </a>
+          )}
+        </nav>
+      </noscript>
+    </div>
+  </main>
+
+  <Footer />
+  <SearchModal />
+</BaseLayout>

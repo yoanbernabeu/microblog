@@ -19,6 +19,7 @@ export interface SiteConfig {
     mastodon?: string;
     linkedin?: string;
     bluesky?: string;
+    youtube?: string;
   };
   links: Array<{
     label: string;
@@ -53,6 +54,7 @@ export function getSocialLinks(): Array<{ platform: string; url: string; icon: s
     mastodon: 'mastodon',
     linkedin: 'linkedin',
     bluesky: 'bluesky',
+    youtube: 'youtube',
   };
 
   for (const [platform, url] of Object.entries(config.social || {})) {
