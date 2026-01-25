@@ -135,10 +135,10 @@ const processedImages = images.map((image) => {
               class="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500"
               loading={eager ? 'eager' : 'lazy'}
               decoding="async"
-              widths={[400, 800, 1200]}
-              sizes={images.length === 1 ? '(max-width: 768px) 100vw, 800px' : '(max-width: 768px) 50vw, 400px'}
+              widths={[320, 640, 800]}
+              sizes={images.length === 1 ? '(max-width: 640px) 100vw, 640px' : '(max-width: 640px) 50vw, 320px'}
               format="webp"
-              quality={80}
+              quality={60}
             />
           ) : (
             <img

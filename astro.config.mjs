@@ -8,6 +8,10 @@ export default defineConfig({
     tailwind()
   ],
   output: 'static',
+  prefetch: {
+    prefetchAll: true,
+    defaultStrategy: 'viewport'
+  },
   build: {
     assets: 'assets'
   },
@@ -17,9 +21,9 @@ export default defineConfig({
       entrypoint: 'astro/assets/services/sharp',
       config: {
         limitInputPixels: false,
-        jpeg: { quality: 80 },
-        webp: { quality: 80 },
-        png: { quality: 80 },
+        jpeg: { quality: 60 },
+        webp: { quality: 60 },
+        png: { quality: 60, compressionLevel: 9 },
       },
     },
     // Domaines autorisés pour les images distantes
