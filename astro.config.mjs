@@ -2,8 +2,7 @@ import { defineConfig } from 'astro/config';
 import tailwind from '@astrojs/tailwind';
 
 export default defineConfig({
-  site: 'https://yoanbernabeu.github.io',
-  base: '/microblog',
+  site: 'https://microblog.yoandev.co',
   integrations: [
     tailwind()
   ],
