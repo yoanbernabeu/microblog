@@ -8,6 +8,10 @@ export default defineConfig({
     tailwind()
   ],
   output: 'static',
+  prefetch: {
+    prefetchAll: true,
+    defaultStrategy: 'viewport'
+  },
   build: {
     assets: 'assets'
   },

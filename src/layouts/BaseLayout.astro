@@ -1,8 +1,8 @@
 ---
 import { getConfig } from '@lib/config';
-// import { ViewTransitions } from 'astro:transitions';
+import { ViewTransitions } from 'astro:transitions';
 import '../styles/global.css';
-// import Lightbox from '@components/Lightbox.astro';
+import Lightbox from '@components/Lightbox.astro';
 
 interface Props {
   title?: string;
@@ -57,15 +57,22 @@ const baseUrl = rawBaseUrl === '/' ? '' : rawBaseUrl.replace(/\/$/, '');
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href={`${baseUrl}/favicon.svg`} />
 
+    <!-- View Transitions pour navigation fluide -->
+    <ViewTransitions />
 
     <!-- Theme script (prevent FOUC) -->
     <script is:inline>
-      (function() {
+      function applyTheme() {
         const theme = localStorage.getItem('theme');
         if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
           document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
         }
-      })();
+      }
+      applyTheme();
+      document.addEventListener('astro:after-swap', applyTheme);
+      document.addEventListener('astro:after-swap', () => window.scrollTo(0, 0));
     </script>
   </head>
   <body class="h-full bg-surface-50 dark:bg-surface-950 transition-colors relative">
@@ -73,8 +80,8 @@ const baseUrl = rawBaseUrl === '/' ? '' : rawBaseUrl.replace(/\/$/, '');
     <div class="fixed inset-0 opacity-40 pointer-events-none" style="background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px); background-size: 24px 24px;" aria-hidden="true"></div>
     <div class="fixed inset-0 opacity-40 pointer-events-none dark:block hidden" style="background-image: linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 24px 24px;" aria-hidden="true"></div>
 
-    <!-- Gradient orbs -->
-    <div class="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+    <!-- Gradient orbs (simplifié pour mobile) -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none hidden sm:block" aria-hidden="true">
       <div class="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/10 dark:bg-primary-500/5 rounded-full blur-3xl"></div>
       <div class="absolute top-1/2 -left-40 w-80 h-80 bg-accent-500/10 dark:bg-accent-500/5 rounded-full blur-3xl"></div>
     </div>
@@ -85,5 +92,6 @@ const baseUrl = rawBaseUrl === '/' ? '' : rawBaseUrl.replace(/\/$/, '');
       <slot />
     </div>
 
+    <Lightbox />
   </body>
 </html>

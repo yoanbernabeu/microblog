@@ -3,12 +3,15 @@ import BaseLayout from '@layouts/BaseLayout.astro';
 import Header from '@components/Header.astro';
 import Footer from '@components/Footer.astro';
 import Post from '@components/Post.astro';
-// import SearchModal from '@components/SearchModal.astro';
+import SearchModal from '@components/SearchModal.astro';
 import { getPublishedPosts } from '@lib/posts';
 import { getConfig } from '@lib/config';
 
 const config = getConfig();
 const posts = await getPublishedPosts();
+const POSTS_PER_PAGE = 5;
+const totalPages = Math.ceil(posts.length / POSTS_PER_PAGE);
+const firstPagePosts = posts.slice(0, POSTS_PER_PAGE);
 ---
 
 <BaseLayout>
@@ -36,14 +39,141 @@ const posts = await getPublishedPosts();
           </div>
         </div>
       ) : (
-        <div class="space-y-6">
-          {posts.map((post, index) => (
-            <Post post={post} eager={index < 2} />
+        <div class="space-y-6" id="posts-container">
+          {firstPagePosts.map((post, index) => (
+            <div class="post-item animate-fade-in">
+              <Post post={post} eager={index < 2} />
+            </div>
           ))}
         </div>
       )}
+
+      <!-- Loader -->
+      <div id="scroll-loader" class="py-8 flex justify-center hidden">
+        <div class="flex items-center gap-3 text-surface-500 dark:text-surface-400">
+          <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Chargement...</span>
+        </div>
+      </div>
+
+      <!-- Sentinel pour IntersectionObserver -->
+      <div id="scroll-sentinel" class="h-4"></div>
+
+      <!-- Message fin de liste -->
+      <div id="end-message" class="py-8 text-center hidden">
+        <p class="text-surface-400 dark:text-surface-500 text-sm">
+          Vous avez tout lu !
+        </p>
+      </div>
     </div>
   </main>
 
   <Footer />
+  <SearchModal />
 </BaseLayout>
+
+<script define:vars={{ totalPages }}>
+  function initInfiniteScroll() {
+    const container = document.getElementById('posts-container');
+    const sentinel = document.getElementById('scroll-sentinel');
+    const loader = document.getElementById('scroll-loader');
+    const endMessage = document.getElementById('end-message');
+
+    if (!container || !sentinel) return;
+
+    let currentPage = 1;
+    let isLoading = false;
+
+    // Si une seule page
+    if (totalPages <= 1) {
+      sentinel.remove();
+      if (container.children.length > 0) {
+        endMessage.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && !isLoading) {
+          loadMorePosts();
+        }
+      });
+    }, {
+      rootMargin: '200px',
+      threshold: 0
+    });
+
+    observer.observe(sentinel);
+
+    async function loadMorePosts() {
+      if (currentPage >= totalPages) return;
+
+      isLoading = true;
+      loader.classList.remove('hidden');
+
+      try {
+        const nextPage = currentPage + 1;
+        const response = await fetch(`/page/${nextPage}/`);
+
+        if (!response.ok) throw new Error('Failed to fetch');
+
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const newPosts = doc.querySelectorAll('#posts-container .post-item');
+
+        newPosts.forEach((post, i) => {
+          const clone = post.cloneNode(true);
+          clone.style.opacity = '0';
+          clone.style.transform = 'translateY(20px)';
+          container.appendChild(clone);
+
+          // Animation d'entrée
+          setTimeout(() => {
+            clone.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
+            clone.style.opacity = '1';
+            clone.style.transform = 'translateY(0)';
+          }, i * 100);
+        });
+
+        currentPage = nextPage;
+
+        if (currentPage >= totalPages) {
+          observer.disconnect();
+          sentinel.remove();
+          endMessage.classList.remove('hidden');
+        }
+      } catch (error) {
+        console.error('Error loading posts:', error);
+      } finally {
+        isLoading = false;
+        loader.classList.add('hidden');
+      }
+    }
+  }
+
+  // Init
+  initInfiniteScroll();
+  document.addEventListener('astro:after-swap', initInfiniteScroll);
+</script>
+
+<style>
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.5s ease-out forwards;
+  }
+</style>
