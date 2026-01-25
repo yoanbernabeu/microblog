@@ -3,6 +3,7 @@ import BaseLayout from '@layouts/BaseLayout.astro';
 import Header from '@components/Header.astro';
 import Footer from '@components/Footer.astro';
 import Post from '@components/Post.astro';
+import Comments from '@components/Comments.astro';
 import SearchModal from '@components/SearchModal.astro';
 import { getPublishedPosts, type PostWithHashtags } from '@lib/posts';
 import { getConfig } from '@lib/config';
@@ -45,7 +46,7 @@ const ogImage = post.data.images?.[0]?.src
       <!-- Fil d'Ariane -->
       <nav class="mb-6" aria-label="Fil d'Ariane">
         <a
-          href={baseUrl}
+          href={baseUrl || '/'}
           class="group inline-flex items-center gap-1.5 text-sm text-surface-500 hover:text-primary-500 dark:text-surface-400 dark:hover:text-primary-400 transition-colors"
         >
           <svg class="w-4 h-4 transform group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -56,6 +57,8 @@ const ogImage = post.data.images?.[0]?.src
       </nav>
 
       <Post post={post} isDetail />
+
+      <Comments term={post.slug || post.id.replace('.md', '')} />
     </div>
   </main>
 

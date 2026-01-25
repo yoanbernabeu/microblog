@@ -1,0 +1,174 @@
+/*! Giscus dark theme for MicroBlog */
+
+main {
+  --color-canvas-default: #18181b;
+  --color-canvas-subtle: rgba(16, 185, 129, 0.08);
+  --color-border-default: rgba(16, 185, 129, 0.25);
+  --color-border-muted: rgba(16, 185, 129, 0.15);
+  --color-text-primary: #f4f4f5;
+  --color-text-secondary: #a1a1aa;
+  --color-text-link: #34d399;
+}
+
+/* Container */
+.gsc-main {
+  gap: 1rem;
+}
+
+/* Comment box */
+.gsc-comment-box {
+  border-radius: 1rem !important;
+  border: 1px solid var(--color-border-default) !important;
+  background: var(--color-canvas-subtle) !important;
+  overflow: hidden;
+}
+
+.gsc-comment-box-tabs {
+  background: transparent !important;
+  border-bottom: 1px solid var(--color-border-muted) !important;
+}
+
+.gsc-comment-box-md-toolbar {
+  border-bottom: 1px solid var(--color-border-muted) !important;
+}
+
+.gsc-comment-box-textarea {
+  background: transparent !important;
+  border: none !important;
+  color: var(--color-text-primary) !important;
+}
+
+.gsc-comment-box-textarea:focus {
+  box-shadow: none !important;
+}
+
+/* Submit button */
+.gsc-comment-box-buttons button[type="submit"] {
+  background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%) !important;
+  border: none !important;
+  border-radius: 9999px !important;
+  padding: 0.5rem 1.25rem !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease !important;
+}
+
+.gsc-comment-box-buttons button[type="submit"]:hover {
+  transform: scale(1.05) !important;
+  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.25) !important;
+}
+
+/* Comments */
+.gsc-comment {
+  border-radius: 1rem !important;
+  border: 1px solid var(--color-border-default) !important;
+  background: var(--color-canvas-subtle) !important;
+  overflow: hidden;
+}
+
+.gsc-comment-header {
+  background: transparent !important;
+  border-bottom: 1px solid var(--color-border-muted) !important;
+}
+
+.gsc-comment-content {
+  padding: 1rem !important;
+}
+
+/* Avatar */
+.gsc-comment-author-avatar img {
+  border-radius: 9999px !important;
+  border: 2px solid #34d399 !important;
+}
+
+/* Reactions */
+.gsc-reactions {
+  gap: 0.5rem !important;
+}
+
+.gsc-reactions-button {
+  border-radius: 9999px !important;
+  border: 1px solid var(--color-border-default) !important;
+  background: var(--color-canvas-subtle) !important;
+  padding: 0.25rem 0.75rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.gsc-reactions-button:hover {
+  border-color: #34d399 !important;
+  background: rgba(52, 211, 153, 0.15) !important;
+  transform: scale(1.05) !important;
+}
+
+.gsc-reactions-button.has-reacted {
+  background: rgba(52, 211, 153, 0.2) !important;
+  border-color: #34d399 !important;
+}
+
+/* Reaction count */
+.gsc-social-reaction-summary-item {
+  border-radius: 9999px !important;
+  padding: 0.25rem 0.75rem !important;
+  background: rgba(52, 211, 153, 0.15) !important;
+  border: 1px solid rgba(52, 211, 153, 0.25) !important;
+}
+
+/* Reply form */
+.gsc-reply-box {
+  border-radius: 0.75rem !important;
+  border: 1px solid var(--color-border-muted) !important;
+  margin-top: 0.75rem !important;
+}
+
+/* Login button */
+.gsc-login-button {
+  background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%) !important;
+  border: none !important;
+  border-radius: 9999px !important;
+  padding: 0.75rem 1.5rem !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease !important;
+  color: white !important;
+}
+
+.gsc-login-button:hover {
+  transform: scale(1.05) !important;
+  box-shadow: 0 10px 25px -5px rgba(52, 211, 153, 0.3) !important;
+}
+
+/* Header */
+.gsc-comments-header {
+  padding-bottom: 1rem !important;
+  border-bottom: 1px solid var(--color-border-muted) !important;
+  margin-bottom: 1rem !important;
+}
+
+/* Emoji picker */
+.gsc-emoji-button {
+  border-radius: 0.5rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.gsc-emoji-button:hover {
+  background: rgba(52, 211, 153, 0.15) !important;
+}
+
+/* Timeline */
+.gsc-timeline {
+  gap: 1rem !important;
+}
+
+/* Links */
+a {
+  color: #34d399 !important;
+}
+
+a:hover {
+  color: #6ee7b7 !important;
+}
+
+/* No comments message */
+.gsc-empty {
+  padding: 2rem !important;
+  text-align: center !important;
+  color: var(--color-text-secondary) !important;
+}
