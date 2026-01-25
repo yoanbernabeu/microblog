@@ -70,7 +70,7 @@ const { term } = Astro.props;
   }
 
   // Observer for theme changes
-  const observer = new MutationObserver((mutations) => {
+  let observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       if (mutation.attributeName === 'class') {
         updateGiscusTheme();
@@ -79,6 +79,11 @@ const { term } = Astro.props;
   });
 
   observer.observe(document.documentElement, { attributes: true });
+
+  // Cleanup avant navigation
+  document.addEventListener('astro:before-swap', () => {
+    observer.disconnect();
+  });
 
   // Init
   loadGiscus();
