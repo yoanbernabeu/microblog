@@ -17,6 +17,9 @@ export default defineConfig({
       entrypoint: 'astro/assets/services/sharp',
       config: {
         limitInputPixels: false,
+        jpeg: { quality: 80 },
+        webp: { quality: 80 },
+        png: { quality: 80 },
       },
     },
     // Domaines autorisés pour les images distantes
