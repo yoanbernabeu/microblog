@@ -425,9 +425,10 @@ const githubRepo = import.meta.env.PUBLIC_GITHUB_REPO || '';
           // Garder l'image existante (pas besoin de la re-committer)
           finalImages.push({ src: img.src, alt: img.alt });
         } else if (img.file) {
-          // Nouvelle image à uploader
+          // Nouvelle image à uploader (stockée dans src/assets pour optimisation)
           const ext = img.file.name.split('.').pop() || 'jpg';
-          const imagePath = `public/images/posts/${timestamp}-${i}-${Date.now()}.${ext}`;
+          const imageTimestamp = Date.now();
+          const imagePath = `src/assets/images/posts/${timestamp}-${i}-${imageTimestamp}.${ext}`;
           const base64Content = img.preview.split(',')[1];
 
           filesToCommit.push({
@@ -437,7 +438,7 @@ const githubRepo = import.meta.env.PUBLIC_GITHUB_REPO || '';
           });
 
           finalImages.push({
-            src: `/images/posts/${timestamp}-${i}-${Date.now()}.${ext}`,
+            src: `@assets/images/posts/${timestamp}-${i}-${imageTimestamp}.${ext}`,
             alt: img.alt,
           });
         }

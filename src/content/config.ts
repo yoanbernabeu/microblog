@@ -10,6 +10,8 @@ const postsCollection = defineCollection({
     publishedAt: z.coerce.date(),
 
     // Images attachées au post (max 4)
+    // Format: "@assets/images/posts/nom.jpg" pour images optimisées
+    // ou URL externe "https://..." pour images distantes
     images: z.array(z.object({
       src: z.string(),
       alt: z.string().optional().default(''),

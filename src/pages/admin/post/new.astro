@@ -341,11 +341,11 @@ const githubRepo = import.meta.env.PUBLIC_GITHUB_REPO || '';
       const filesToCommit = [];
       const uploadedImages = [];
 
-      // Préparer les images
+      // Préparer les images (stockées dans src/assets pour optimisation au build)
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
         const ext = img.file.name.split('.').pop() || 'jpg';
-        const imagePath = `public/images/posts/${timestamp}-${i}.${ext}`;
+        const imagePath = `src/assets/images/posts/${timestamp}-${i}.${ext}`;
 
         // Extraire le contenu base64 (sans le préfixe data:image/...)
         const base64Content = img.preview.split(',')[1];
@@ -357,7 +357,7 @@ const githubRepo = import.meta.env.PUBLIC_GITHUB_REPO || '';
         });
 
         uploadedImages.push({
-          src: `/images/posts/${timestamp}-${i}.${ext}`,
+          src: `@assets/images/posts/${timestamp}-${i}.${ext}`,
           alt: img.alt,
         });
       }

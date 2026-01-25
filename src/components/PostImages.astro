@@ -1,4 +1,6 @@
 ---
+import { Image } from 'astro:assets';
+
 interface Props {
   images: Array<{
     src: string;
@@ -9,51 +11,165 @@ interface Props {
 const { images } = Astro.props;
 const baseUrl = import.meta.env.BASE_URL;
 
-// Grille adaptative selon le nombre d'images - taille reduite
+// Import de toutes les images du dossier assets
+const allImages = import.meta.glob<{ default: ImageMetadata }>(
+  '/src/assets/images/**/*.{jpg,jpeg,png,webp,gif}',
+  { eager: true }
+);
+
+// Grille adaptative selon le nombre d'images - pleine largeur
 const getGridClass = (count: number): string => {
   switch (count) {
     case 1:
-      return 'grid-cols-1 max-w-xs';
+      return 'grid-cols-1';
     case 2:
-      return 'grid-cols-2 max-w-sm';
+      return 'grid-cols-2';
     case 3:
-      return 'grid-cols-3 max-w-md';
+      return 'grid-cols-3';
     case 4:
-      return 'grid-cols-2 max-w-sm';
+      return 'grid-cols-2';
     default:
-      return 'grid-cols-2 max-w-sm';
+      return 'grid-cols-2';
+  }
+};
+
+// Ratio d'aspect selon le nombre d'images
+const getAspectClass = (count: number): string => {
+  switch (count) {
+    case 1:
+      return 'aspect-video'; // 16:9 pour une seule image
+    case 2:
+      return 'aspect-[4/3]';
+    case 3:
+      return 'aspect-square';
+    case 4:
+      return 'aspect-square';
+    default:
+      return 'aspect-square';
   }
 };
 
 const gridClass = getGridClass(images.length);
+const aspectClass = getAspectClass(images.length);
+
+// Vérifier si l'image est locale (dans assets)
+const isAssetImage = (src: string): boolean => {
+  return src.startsWith('@assets/') || src.startsWith('/src/assets/');
+};
+
+// Vérifier si l'image est dans public
+const isPublicImage = (src: string): boolean => {
+  return src.startsWith('/images/') || src.startsWith('/');
+};
+
+// Vérifier si l'image est externe
+const isExternalImage = (src: string): boolean => {
+  return src.startsWith('http://') || src.startsWith('https://');
+};
+
+// Résoudre le chemin de l'image
+const resolveImagePath = (src: string): string => {
+  if (src.startsWith('@assets/')) {
+    return `/src/assets/${src.replace('@assets/', '')}`;
+  }
+  return src;
+};
+
+// Obtenir l'image optimisée ou l'URL
+const getOptimizedImage = (src: string): ImageMetadata | null => {
+  const resolvedPath = resolveImagePath(src);
+
+  // Chercher dans les images importées
+  if (allImages[resolvedPath]) {
+    return allImages[resolvedPath].default;
+  }
+
+  // Essayer aussi avec le chemin direct pour les anciennes images
+  const legacyPath = `/src/assets/images/posts/${src.split('/').pop()}`;
+  if (allImages[legacyPath]) {
+    return allImages[legacyPath].default;
+  }
+
+  return null;
+};
+
+// Construire l'URL pour la lightbox
+const getLightboxUrl = (src: string, optimizedSrc?: string): string => {
+  if (optimizedSrc) return optimizedSrc;
+  if (isExternalImage(src)) return src;
+  if (isPublicImage(src)) return `${baseUrl}${src}`;
+  return src;
+};
+
+// Préparer les images avec leurs métadonnées
+const processedImages = images.map((image) => {
+  const optimized = getOptimizedImage(image.src);
+  return {
+    ...image,
+    optimized,
+    isOptimized: !!optimized,
+  };
+});
 ---
 
 {images.length > 0 && (
-  <div class={`mt-4 grid ${gridClass} gap-1.5 rounded-xl overflow-hidden`}>
-    {images.map((image, index) => {
-      const imageSrc = image.src.startsWith('/') ? `${baseUrl}${image.src}` : image.src;
+  <div class={`mt-6 grid ${gridClass} gap-2 w-full rounded-2xl overflow-hidden`}>
+    {processedImages.map((image, index) => {
+      const isFirst = index === 0;
+      const isThreeImages = images.length === 3;
 
       return (
         <button
           type="button"
-          class="relative overflow-hidden bg-surface-100 dark:bg-surface-800 rounded-lg group/img aspect-square cursor-zoom-in"
-          data-lightbox-src={imageSrc}
+          class={`relative overflow-hidden bg-surface-100 dark:bg-surface-800 group/img ${aspectClass} cursor-zoom-in ${isThreeImages && isFirst ? 'row-span-2 !aspect-auto h-full' : ''}`}
+          data-lightbox-src={image.optimized ? image.optimized.src : getLightboxUrl(image.src)}
           data-lightbox-alt={image.alt || ''}
           aria-label={image.alt || `Agrandir image ${index + 1}`}
         >
-          <img
-            src={imageSrc}
-            alt={image.alt || ''}
-            class="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
-            loading="lazy"
-          />
-          <div class="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors duration-300 flex items-center justify-center">
-            <svg class="w-6 h-6 text-white opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-            </svg>
+          {image.isOptimized && image.optimized ? (
+            <Image
+              src={image.optimized}
+              alt={image.alt || ''}
+              class="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500"
+              loading="lazy"
+              decoding="async"
+              widths={[400, 800, 1200]}
+              sizes={images.length === 1 ? '(max-width: 768px) 100vw, 800px' : '(max-width: 768px) 50vw, 400px'}
+              format="webp"
+              quality={80}
+            />
+          ) : (
+            <img
+              src={isExternalImage(image.src) ? image.src : `${baseUrl}${image.src}`}
+              alt={image.alt || ''}
+              class="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500"
+              loading="lazy"
+              decoding="async"
+            />
+          )}
+          <div class="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity duration-300">
+            <div class="absolute bottom-3 right-3">
+              <div class="p-2 bg-white/90 dark:bg-surface-900/90 rounded-full shadow-lg backdrop-blur-sm">
+                <svg class="w-5 h-5 text-surface-700 dark:text-surface-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                </svg>
+              </div>
+            </div>
           </div>
         </button>
       );
     })}
   </div>
 )}
+
+<style>
+  /* Grille spéciale pour 3 images : grande à gauche, 2 petites à droite */
+  .grid-cols-3 {
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+
+  .grid-cols-3 > :first-child {
+    grid-row: span 2;
+  }
+</style>

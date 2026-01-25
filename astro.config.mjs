@@ -10,5 +10,26 @@ export default defineConfig({
   output: 'static',
   build: {
     assets: 'assets'
-  }
+  },
+  image: {
+    // Optimisation des images avec Sharp
+    service: {
+      entrypoint: 'astro/assets/services/sharp',
+      config: {
+        limitInputPixels: false,
+      },
+    },
+    // Domaines autorisés pour les images distantes
+    remotePatterns: [
+      {
+        protocol: 'https',
+      },
+    ],
+  },
+  vite: {
+    build: {
+      // Optimisation des assets
+      assetsInlineLimit: 4096,
+    },
+  },
 });

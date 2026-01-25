@@ -129,3 +129,114 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Métadonnées Open Graph d'une URL
+ */
+export interface OGMetadata {
+  title: string | null;
+  description: string | null;
+  image: string | null;
+  siteName: string | null;
+  favicon: string | null;
+}
+
+/**
+ * Récupère les métadonnées Open Graph d'une URL
+ */
+export async function fetchOGMetadata(url: string): Promise<OGMetadata> {
+  const defaultMetadata: OGMetadata = {
+    title: null,
+    description: null,
+    image: null,
+    siteName: null,
+    favicon: null,
+  };
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; MicroBlog/1.0; +https://github.com)',
+      },
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) return defaultMetadata;
+
+    const html = await response.text();
+    const parsed = new URL(url);
+
+    // Extraction des métadonnées via regex (pas de DOM côté serveur)
+    const getMetaContent = (property: string): string | null => {
+      const patterns = [
+        new RegExp(`<meta[^>]+property=["']${property}["'][^>]+content=["']([^"']+)["']`, 'i'),
+        new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${property}["']`, 'i'),
+        new RegExp(`<meta[^>]+name=["']${property}["'][^>]+content=["']([^"']+)["']`, 'i'),
+        new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${property}["']`, 'i'),
+      ];
+
+      for (const pattern of patterns) {
+        const match = html.match(pattern);
+        if (match) return decodeHtmlEntities(match[1]);
+      }
+      return null;
+    };
+
+    // Extraction du titre
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const pageTitle = titleMatch ? decodeHtmlEntities(titleMatch[1]) : null;
+
+    // Extraction du favicon
+    const faviconMatch = html.match(/<link[^>]+rel=["'](?:icon|shortcut icon)["'][^>]+href=["']([^"']+)["']/i) ||
+                         html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["'](?:icon|shortcut icon)["']/i);
+    let favicon = faviconMatch ? faviconMatch[1] : null;
+
+    // Résoudre les URLs relatives pour le favicon
+    if (favicon && !favicon.startsWith('http')) {
+      favicon = favicon.startsWith('/')
+        ? `${parsed.origin}${favicon}`
+        : `${parsed.origin}/${favicon}`;
+    }
+
+    // Résoudre les URLs relatives pour l'image OG
+    let ogImage = getMetaContent('og:image') || getMetaContent('twitter:image');
+    if (ogImage && !ogImage.startsWith('http')) {
+      ogImage = ogImage.startsWith('/')
+        ? `${parsed.origin}${ogImage}`
+        : `${parsed.origin}/${ogImage}`;
+    }
+
+    return {
+      title: getMetaContent('og:title') || getMetaContent('twitter:title') || pageTitle,
+      description: getMetaContent('og:description') || getMetaContent('twitter:description') || getMetaContent('description'),
+      image: ogImage,
+      siteName: getMetaContent('og:site_name') || parsed.hostname,
+      favicon: favicon || `${parsed.origin}/favicon.ico`,
+    };
+  } catch {
+    return defaultMetadata;
+  }
+}
+
+/**
+ * Décode les entités HTML
+ */
+function decodeHtmlEntities(text: string): string {
+  const entities: Record<string, string> = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#039;': "'",
+    '&#39;': "'",
+    '&apos;': "'",
+    '&nbsp;': ' ',
+  };
+
+  return text.replace(/&[^;]+;/g, (entity) => entities[entity] || entity);
+}

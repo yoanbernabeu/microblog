@@ -1,80 +1,279 @@
 ---
 ---
 
-<!-- Lightbox modal global -->
+<!-- Lightbox modal global avec slideshow -->
 <div
   id="lightbox-modal"
-  class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/95 backdrop-blur-md p-4 sm:p-8"
+  class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/95 backdrop-blur-md"
   role="dialog"
   aria-modal="true"
   aria-label="Visualisation de l'image"
 >
+  <!-- Header avec compteur et bouton fermer -->
+  <div class="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-20">
+    <div
+      id="lightbox-counter"
+      class="px-3 py-1.5 text-sm font-medium text-white/90 bg-white/10 rounded-full backdrop-blur-sm"
+    >
+      1 / 1
+    </div>
+    <button
+      type="button"
+      class="p-3 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all duration-200 hover:scale-110 backdrop-blur-sm"
+      aria-label="Fermer (Echap)"
+      id="lightbox-close"
+    >
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  </div>
+
+  <!-- Bouton précédent -->
   <button
     type="button"
-    class="absolute top-4 right-4 z-10 p-3 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all duration-200 hover:scale-110"
-    aria-label="Fermer"
-    id="lightbox-close"
+    id="lightbox-prev"
+    class="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-3 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all duration-200 hover:scale-110 backdrop-blur-sm disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100"
+    aria-label="Image précédente (flèche gauche)"
   >
     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
     </svg>
   </button>
 
-  <img
-    id="lightbox-image"
-    src=""
-    alt=""
-    class="max-w-[95vw] max-h-[95vh] object-contain rounded-lg shadow-2xl"
-  />
+  <!-- Bouton suivant -->
+  <button
+    type="button"
+    id="lightbox-next"
+    class="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-3 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all duration-200 hover:scale-110 backdrop-blur-sm disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100"
+    aria-label="Image suivante (flèche droite)"
+  >
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+    </svg>
+  </button>
+
+  <!-- Container de l'image avec animation -->
+  <div class="relative w-full h-full flex items-center justify-center p-4 sm:p-16">
+    <img
+      id="lightbox-image"
+      src=""
+      alt=""
+      class="max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-opacity duration-300"
+    />
+  </div>
+
+  <!-- Indicateurs de points (dots) -->
+  <div
+    id="lightbox-dots"
+    class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20"
+  >
+  </div>
+
+  <!-- Instructions clavier (visible sur desktop) -->
+  <div class="absolute bottom-6 right-6 hidden sm:flex items-center gap-4 text-xs text-white/50">
+    <span class="flex items-center gap-1">
+      <kbd class="px-1.5 py-0.5 bg-white/10 rounded text-[10px]">←</kbd>
+      <kbd class="px-1.5 py-0.5 bg-white/10 rounded text-[10px]">→</kbd>
+      naviguer
+    </span>
+    <span class="flex items-center gap-1">
+      <kbd class="px-1.5 py-0.5 bg-white/10 rounded text-[10px]">Esc</kbd>
+      fermer
+    </span>
+  </div>
 </div>
 
 <script>
+  interface LightboxImage {
+    src: string;
+    alt: string;
+  }
+
   function initGlobalLightbox() {
     const modal = document.getElementById('lightbox-modal');
     const image = document.getElementById('lightbox-image') as HTMLImageElement;
     const closeButton = document.getElementById('lightbox-close');
+    const prevButton = document.getElementById('lightbox-prev');
+    const nextButton = document.getElementById('lightbox-next');
+    const counter = document.getElementById('lightbox-counter');
+    const dotsContainer = document.getElementById('lightbox-dots');
 
     if (!modal || !image) return;
 
-    // Open lightbox on any image with data-lightbox-src
-    document.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      const button = target.closest('[data-lightbox-src]');
+    let images: LightboxImage[] = [];
+    let currentIndex = 0;
 
-      if (button) {
-        const src = button.getAttribute('data-lightbox-src');
-        const alt = button.getAttribute('data-lightbox-alt') || '';
+    // Collecter toutes les images d'un groupe (même article/post)
+    const collectImagesFromGroup = (clickedElement: Element): LightboxImage[] => {
+      // Trouver le conteneur parent (article ou grille d'images)
+      const article = clickedElement.closest('article') || clickedElement.closest('[class*="grid"]')?.parentElement;
+      if (!article) {
+        // Si pas de conteneur, retourner juste l'image cliquée
+        const src = clickedElement.getAttribute('data-lightbox-src');
+        const alt = clickedElement.getAttribute('data-lightbox-alt') || '';
+        return src ? [{ src, alt }] : [];
+      }
 
-        if (src) {
-          image.src = src;
-          image.alt = alt;
-          modal.classList.remove('hidden');
-          modal.classList.add('flex');
-          document.body.style.overflow = 'hidden';
+      // Collecter toutes les images du groupe
+      const imageButtons = article.querySelectorAll('[data-lightbox-src]');
+      return Array.from(imageButtons).map((btn) => ({
+        src: btn.getAttribute('data-lightbox-src') || '',
+        alt: btn.getAttribute('data-lightbox-alt') || '',
+      })).filter((img) => img.src);
+    };
+
+    // Mettre à jour l'affichage
+    const updateDisplay = () => {
+      const currentImage = images[currentIndex];
+      if (!currentImage) return;
+
+      // Fade out
+      image.style.opacity = '0';
+
+      setTimeout(() => {
+        image.src = currentImage.src;
+        image.alt = currentImage.alt;
+        // Fade in
+        image.style.opacity = '1';
+      }, 150);
+
+      // Compteur
+      if (counter) {
+        counter.textContent = `${currentIndex + 1} / ${images.length}`;
+        counter.style.display = images.length > 1 ? 'block' : 'none';
+      }
+
+      // Boutons prev/next
+      if (prevButton) {
+        prevButton.disabled = currentIndex === 0;
+        prevButton.style.display = images.length > 1 ? 'block' : 'none';
+      }
+      if (nextButton) {
+        nextButton.disabled = currentIndex === images.length - 1;
+        nextButton.style.display = images.length > 1 ? 'block' : 'none';
+      }
+
+      // Dots
+      if (dotsContainer) {
+        if (images.length > 1 && images.length <= 10) {
+          dotsContainer.innerHTML = images.map((_, i) => `
+            <button
+              type="button"
+              class="w-2 h-2 rounded-full transition-all duration-200 ${i === currentIndex ? 'bg-white w-6' : 'bg-white/40 hover:bg-white/60'}"
+              data-index="${i}"
+              aria-label="Aller à l'image ${i + 1}"
+            ></button>
+          `).join('');
+        } else {
+          dotsContainer.innerHTML = '';
         }
       }
-    });
+    };
 
-    // Close lightbox
+    // Navigation
+    const goTo = (index: number) => {
+      if (index >= 0 && index < images.length) {
+        currentIndex = index;
+        updateDisplay();
+      }
+    };
+
+    const goPrev = () => goTo(currentIndex - 1);
+    const goNext = () => goTo(currentIndex + 1);
+
+    // Ouvrir la lightbox
+    const openLightbox = (clickedElement: Element) => {
+      images = collectImagesFromGroup(clickedElement);
+      const clickedSrc = clickedElement.getAttribute('data-lightbox-src');
+      currentIndex = images.findIndex((img) => img.src === clickedSrc);
+      if (currentIndex === -1) currentIndex = 0;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+      updateDisplay();
+    };
+
+    // Fermer la lightbox
     const closeLightbox = () => {
       modal.classList.add('hidden');
       modal.classList.remove('flex');
       document.body.style.overflow = '';
       image.src = '';
+      images = [];
+      currentIndex = 0;
     };
 
-    closeButton?.addEventListener('click', closeLightbox);
-
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeLightbox();
+    // Event listeners
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const button = target.closest('[data-lightbox-src]');
+      if (button) {
+        e.preventDefault();
+        openLightbox(button);
+      }
     });
 
-    // Close on Escape
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+    closeButton?.addEventListener('click', closeLightbox);
+    prevButton?.addEventListener('click', goPrev);
+    nextButton?.addEventListener('click', goNext);
+
+    // Clic sur les dots
+    dotsContainer?.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const index = target.getAttribute('data-index');
+      if (index !== null) {
+        goTo(parseInt(index, 10));
+      }
+    });
+
+    // Fermer en cliquant sur le fond
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal || (e.target as HTMLElement).closest('#lightbox-image')?.parentElement === e.target) {
         closeLightbox();
       }
     });
+
+    // Navigation clavier
+    document.addEventListener('keydown', (e) => {
+      if (modal.classList.contains('hidden')) return;
+
+      switch (e.key) {
+        case 'Escape':
+          closeLightbox();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          goPrev();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          goNext();
+          break;
+      }
+    });
+
+    // Swipe sur mobile
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    modal.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    modal.addEventListener('touchend', (e) => {
+      touchEndX = e.changedTouches[0].screenX;
+      const diff = touchStartX - touchEndX;
+
+      if (Math.abs(diff) > 50) {
+        if (diff > 0) {
+          goNext(); // Swipe gauche = image suivante
+        } else {
+          goPrev(); // Swipe droite = image précédente
+        }
+      }
+    }, { passive: true });
   }
 
   initGlobalLightbox();
