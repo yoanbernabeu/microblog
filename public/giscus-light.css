@@ -1,4 +1,4 @@
-/*! Giscus light theme for MicroBlog */
+/*! Giscus light theme for MicroBlog - Optimisé */
 
 main {
   --color-canvas-default: #ffffff;
@@ -49,12 +49,6 @@ main {
   border-radius: 9999px !important;
   padding: 0.5rem 1.25rem !important;
   font-weight: 600 !important;
-  transition: all 0.3s ease !important;
-}
-
-.gsc-comment-box-buttons button[type="submit"]:hover {
-  transform: scale(1.05) !important;
-  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.25) !important;
 }
 
 /* Comments */
@@ -90,13 +84,6 @@ main {
   border: 1px solid var(--color-border-default) !important;
   background: var(--color-canvas-subtle) !important;
   padding: 0.25rem 0.75rem !important;
-  transition: all 0.2s ease !important;
-}
-
-.gsc-reactions-button:hover {
-  border-color: #10b981 !important;
-  background: rgba(16, 185, 129, 0.1) !important;
-  transform: scale(1.05) !important;
 }
 
 .gsc-reactions-button.has-reacted {
@@ -126,13 +113,7 @@ main {
   border-radius: 9999px !important;
   padding: 0.75rem 1.5rem !important;
   font-weight: 600 !important;
-  transition: all 0.3s ease !important;
   color: white !important;
-}
-
-.gsc-login-button:hover {
-  transform: scale(1.05) !important;
-  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.25) !important;
 }
 
 /* Header */
@@ -145,11 +126,6 @@ main {
 /* Emoji picker */
 .gsc-emoji-button {
   border-radius: 0.5rem !important;
-  transition: all 0.2s ease !important;
-}
-
-.gsc-emoji-button:hover {
-  background: rgba(16, 185, 129, 0.1) !important;
 }
 
 /* Timeline */
@@ -160,10 +136,6 @@ main {
 /* Links */
 a {
   color: #10b981 !important;
-}
-
-a:hover {
-  color: #059669 !important;
 }
 
 /* No comments message */
