@@ -196,6 +196,26 @@
     text-wrap: balance;
   }
 
+  /* Optimisations mobile - désactive effets GPU coûteux */
+  @media (max-width: 640px) {
+    .shadow-glow,
+    .hover\:shadow-glow:hover {
+      box-shadow: none !important;
+    }
+
+    .backdrop-blur-sm,
+    .backdrop-blur-md,
+    .backdrop-blur-xl {
+      backdrop-filter: none !important;
+    }
+
+    .group:hover .group-hover\:scale-105,
+    .hover\:scale-105:hover,
+    .group-hover\/img\:scale-105 {
+      transform: none !important;
+    }
+  }
+
   /* Fade edges */
   .fade-edges {
     mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);

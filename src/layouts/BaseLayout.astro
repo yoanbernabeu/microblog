@@ -76,9 +76,9 @@ const baseUrl = rawBaseUrl === '/' ? '' : rawBaseUrl.replace(/\/$/, '');
     </script>
   </head>
   <body class="h-full bg-surface-50 dark:bg-surface-950 transition-colors relative">
-    <!-- Background pattern -->
-    <div class="fixed inset-0 opacity-40 pointer-events-none" style="background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px); background-size: 24px 24px;" aria-hidden="true"></div>
-    <div class="fixed inset-0 opacity-40 pointer-events-none dark:block hidden" style="background-image: linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 24px 24px;" aria-hidden="true"></div>
+    <!-- Background pattern (desktop only) -->
+    <div class="fixed inset-0 opacity-40 pointer-events-none hidden sm:block" style="background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px); background-size: 24px 24px;" aria-hidden="true"></div>
+    <div class="fixed inset-0 opacity-40 pointer-events-none hidden dark:sm:block" style="background-image: linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 24px 24px;" aria-hidden="true"></div>
 
     <!-- Gradient orbs (simplifié pour mobile) -->
     <div class="fixed inset-0 overflow-hidden pointer-events-none hidden sm:block" aria-hidden="true">
